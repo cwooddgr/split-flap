@@ -102,7 +102,8 @@ class SplitFlapDisplay {
                     bottomContent: bottomContent,
                     currentChar: ' ',
                     targetChar: ' ',
-                    timeoutId: null
+                    timeoutId: null,
+                    animationId: 0
                 });
             }
             
@@ -188,6 +189,14 @@ class SplitFlapDisplay {
             flap.timeoutId = null;
         }
 
+        // Remove any leftover flip elements from a previous animation
+        const existingFlips = flap.container.querySelectorAll('.flap-flip');
+        existingFlips.forEach(el => el.remove());
+
+        // Bump animation id so old sequences know they're obsolete
+        flap.animationId += 1;
+        const animationId = flap.animationId;
+
         if (flap.currentChar === flap.targetChar) {
             return; // Already showing the target character
         }
@@ -201,15 +210,21 @@ class SplitFlapDisplay {
             steps += CHARSET.length;
         }
         
-        this.flipSequence(row, col, steps, 0);
+        this.flipSequence(row, col, steps, 0, animationId);
     }
 
-    flipSequence(row, col, totalSteps, currentStep) {
+    flipSequence(row, col, totalSteps, currentStep, animationId) {
         if (currentStep >= totalSteps) {
             return;
         }
 
         const flap = this.flaps[row][col];
+
+        // If a newer animation has started for this flap, abort this sequence
+        if (animationId !== flap.animationId) {
+            return;
+        }
+
         const currentIndex = CHARSET.indexOf(flap.currentChar);
         const nextIndex = (currentIndex + 1) % CHARSET.length;
         const nextChar = CHARSET[nextIndex];
@@ -234,13 +249,20 @@ class SplitFlapDisplay {
 
         // Update display after animation
         flap.timeoutId = setTimeout(() => {
+            // If a newer animation has started since this timeout was scheduled, abort
+            if (animationId !== flap.animationId) {
+                // Ensure this flip element doesn't linger on screen
+                flipElement.remove();
+                return;
+            }
+
             flap.currentChar = nextChar;
             flap.topContent.textContent = nextChar;
             flap.bottomContent.textContent = nextChar;
             flipElement.remove();
             
             // Continue sequence
-            this.flipSequence(row, col, totalSteps, currentStep + 1);
+            this.flipSequence(row, col, totalSteps, currentStep + 1, animationId);
         }, 50);
     }
 
