@@ -101,7 +101,8 @@ class SplitFlapDisplay {
                     topContent: topContent,
                     bottomContent: bottomContent,
                     currentChar: ' ',
-                    targetChar: ' '
+                    targetChar: ' ',
+                    timeoutId: null
                 });
             }
             
@@ -181,6 +182,12 @@ class SplitFlapDisplay {
     animateFlap(row, col) {
         const flap = this.flaps[row][col];
         
+        // Cancel any existing pending animation step for this flap
+        if (flap.timeoutId !== null) {
+            clearTimeout(flap.timeoutId);
+            flap.timeoutId = null;
+        }
+
         if (flap.currentChar === flap.targetChar) {
             return; // Already showing the target character
         }
@@ -226,7 +233,7 @@ class SplitFlapDisplay {
         }, 10);
 
         // Update display after animation
-        setTimeout(() => {
+        flap.timeoutId = setTimeout(() => {
             flap.currentChar = nextChar;
             flap.topContent.textContent = nextChar;
             flap.bottomContent.textContent = nextChar;
