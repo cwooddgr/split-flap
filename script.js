@@ -15,6 +15,19 @@ class SplitFlapDisplay {
     initAudio() {
         // Initialize Web Audio API for click sounds
         this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // iOS/Safari require user interaction to enable audio
+        const enableAudio = () => {
+            if (this.audioContext.state === 'suspended') {
+                this.audioContext.resume();
+            }
+            // Remove listeners after first interaction
+            document.removeEventListener('touchstart', enableAudio);
+            document.removeEventListener('click', enableAudio);
+        };
+        
+        document.addEventListener('touchstart', enableAudio, { once: true });
+        document.addEventListener('click', enableAudio, { once: true });
     }
 
     playClickSound() {
