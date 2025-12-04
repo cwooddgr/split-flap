@@ -96,7 +96,7 @@ body {
     font-weight: 600;
     color: #ffffff;
     text-shadow: 0 0 1px rgba(0, 0, 0, 0.3);
-    font-family: 'SF Mono', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', monospace;
+    font-family: 'Menlo', 'SF Mono', 'Roboto Mono', 'Consolas', monospace;
     line-height: 1;
     left: 0;
     letter-spacing: 0;
