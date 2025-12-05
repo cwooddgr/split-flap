@@ -1,4 +1,4 @@
-import { db, doc, onSnapshot } from './firebase-init.js';
+import { db, doc, onSnapshot, ensureSignedIn } from './firebase-init.js';
 import { SplitFlapDisplay } from './splitflap.js';
 
 const ROOM_STORAGE_KEY = 'splitflapRoomId';
@@ -55,43 +55,48 @@ if (audioPromptEl) {
     });
 }
 
-// Generate QR code pointing to control.html for this room
-const qrElement = document.getElementById('qrcode');
-if (qrElement && window.QRCode) {
-    const controlUrl = new URL('control.html', window.location.href);
-    controlUrl.searchParams.set('room', roomId);
-    // Also store room in the hash as a fallback, in case query params are stripped
-    controlUrl.hash = 'room=' + roomId;
-    const controlUrlString = controlUrl.toString();
+// Generate QR code pointing to control.html for this room and listen for updates
+(async () => {
+    // Wait for anonymous auth so Firestore rules allow access
+    await ensureSignedIn();
 
-    // eslint-disable-next-line no-new
-    new QRCode(qrElement, {
-        text: controlUrlString,
-        width: 112,
-        height: 112,
-        colorDark: '#000000',
-        colorLight: '#ffffff',
-        correctLevel: window.QRCode.CorrectLevel.M,
-    });
-}
+    // QR code
+    const qrElement = document.getElementById('qrcode');
+    if (qrElement && window.QRCode) {
+        const controlUrl = new URL('control.html', window.location.href);
+        controlUrl.searchParams.set('room', roomId);
+        // Also store room in the hash as a fallback, in case query params are stripped
+        controlUrl.hash = 'room=' + roomId;
+        const controlUrlString = controlUrl.toString();
 
-// Listen to Firestore document for this room
-const roomRef = doc(db, 'rooms', roomId);
-
-onSnapshot(
-    roomRef,
-    (snapshot) => {
-        if (!snapshot.exists()) {
-            return;
-        }
-        const data = snapshot.data();
-        if (typeof data.text === 'string') {
-            display.setText(data.text);
-        }
-    },
-    (error) => {
-        console.error('Error listening to room document', error);
+        // eslint-disable-next-line no-new
+        new QRCode(qrElement, {
+            text: controlUrlString,
+            width: 112,
+            height: 112,
+            colorDark: '#000000',
+            colorLight: '#ffffff',
+            correctLevel: window.QRCode.CorrectLevel.M,
+        });
     }
-);
 
+    // Listen to Firestore document for this room
+    const roomRef = doc(db, 'rooms', roomId);
+
+    onSnapshot(
+        roomRef,
+        (snapshot) => {
+            if (!snapshot.exists()) {
+                return;
+            }
+            const data = snapshot.data();
+            if (typeof data.text === 'string') {
+                display.setText(data.text);
+            }
+        },
+        (error) => {
+            console.error('Error listening to room document', error);
+        }
+    );
+})();
 

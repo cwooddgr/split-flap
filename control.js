@@ -1,4 +1,4 @@
-import { db, doc, setDoc, serverTimestamp } from './firebase-init.js';
+import { db, doc, setDoc, serverTimestamp, ensureSignedIn } from './firebase-init.js';
 
 // Room id can come from either the query string (?room=ABC123) or the hash (#room=ABC123)
 const params = new URLSearchParams(window.location.search);
@@ -36,13 +36,17 @@ if (!roomId || !isValidRoom(roomId)) {
     throw new Error('Invalid or missing room id. Please rescan the QR code.');
 }
 
-const roomRef = doc(db, 'rooms', roomId);
+(async () => {
+    // Wait for anonymous auth so Firestore rules allow access
+    await ensureSignedIn();
 
-const textInput = document.getElementById('textInput');
-const displayBtn = document.getElementById('displayBtn');
-const randomBtn = document.getElementById('randomBtn');
+    const roomRef = doc(db, 'rooms', roomId);
 
-const randomTexts = [
+    const textInput = document.getElementById('textInput');
+    const displayBtn = document.getElementById('displayBtn');
+    const randomBtn = document.getElementById('randomBtn');
+
+    const randomTexts = [
     'IF YOU WANT\nTO FIND HAPPINESS\nFIND GRATITUDE',
     'EVERY MOMENT\nIS A FRESH\nBEGINNING',
     'DREAM BIG\nWORK HARD\nSTAY FOCUSED',
@@ -79,51 +83,51 @@ const randomTexts = [
     "DOING NOTHING IS\nHARD. YOU NEVER\nKNOW WHEN YOU'RE\nDONE",
     'WARNING: DATES IN\nCALENDAR ARE\nCLOSER THAN THEY\nAPPEAR',
     'IF PLAN A FAILS\nREMEMBER:\nTHERE ARE 25 MORE\nLETTERS',
-];
+    ];
 
-async function sendText(source) {
-    if (!textInput) return;
-    const text = textInput.value || '';
+    async function sendText(source) {
+        if (!textInput) return;
+        const text = textInput.value || '';
 
-    try {
-        await setDoc(
-            roomRef,
-            {
-                text,
-                updatedAt: serverTimestamp(),
-                source,
-            },
-            { merge: true }
-        );
-    } catch (err) {
-        console.error('Error writing message to room', err);
+        try {
+            await setDoc(
+                roomRef,
+                {
+                    text,
+                    updatedAt: serverTimestamp(),
+                    source,
+                },
+                { merge: true }
+            );
+        } catch (err) {
+            console.error('Error writing message to room', err);
+        }
     }
-}
 
-if (displayBtn) {
-    displayBtn.addEventListener('click', () => {
-        void sendText('manual');
-    });
-}
-
-if (textInput) {
-    textInput.addEventListener('keydown', (e) => {
-        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-            e.preventDefault();
+    if (displayBtn) {
+        displayBtn.addEventListener('click', () => {
             void sendText('manual');
-        }
-    });
-}
+        });
+    }
 
-if (randomBtn) {
-    randomBtn.addEventListener('click', () => {
-        const randomText =
-            randomTexts[Math.floor(Math.random() * randomTexts.length)];
-        if (textInput) {
-            textInput.value = randomText;
-        }
-        void sendText('random');
-    });
-}
+    if (textInput) {
+        textInput.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                e.preventDefault();
+                void sendText('manual');
+            }
+        });
+    }
 
+    if (randomBtn) {
+        randomBtn.addEventListener('click', () => {
+            const randomText =
+                randomTexts[Math.floor(Math.random() * randomTexts.length)];
+            if (textInput) {
+                textInput.value = randomText;
+            }
+            void sendText('random');
+        });
+    }
+})();
 
