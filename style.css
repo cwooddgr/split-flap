@@ -50,6 +50,11 @@ body {
     margin-bottom: 0;
 }
 
+.display-container {
+    position: relative;
+    padding-bottom: 120px; /* leave space so QR overlay doesn't cover text */
+}
+
 .flap-container {
     width: clamp(20px, 3.8vw, 50px);
     height: clamp(28px, 5.3vw, 70px);
@@ -179,6 +184,35 @@ body {
     box-sizing: border-box;
 }
 
+/* Display page QR overlay */
+#qr-container {
+    position: fixed;
+    right: 52px;
+    bottom: 52px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    padding: 8px 10px;
+    border-radius: 14px;
+    background: rgba(0, 0, 0, 0.75);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(12px);
+    z-index: 100;
+}
+
+#qrcode {
+    width: 72px;
+    height: 72px;
+    background: #ffffff;
+    border-radius: 8px;
+}
+
+.display-container {
+    position: relative;
+}
+
 #textInput {
     padding: 16px 20px;
     font-size: 17px;
@@ -237,6 +271,34 @@ button:active {
 
 #randomBtn:active {
     box-shadow: 0 4px 16px rgba(250, 112, 154, 0.35);
+}
+
+/* Controller page specifics */
+.controller-container {
+    max-width: 640px;
+}
+
+.controller-title {
+    color: #ffffff;
+    margin-bottom: 6px;
+    font-size: 26px;
+}
+
+.controller-subtitle {
+    color: rgba(255, 255, 255, 0.75);
+    margin-bottom: 12px;
+}
+
+.controller-room-id {
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.room-error {
+    color: #ff6b6b;
+    margin-bottom: 16px;
+    font-size: 14px;
 }
 
 

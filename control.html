@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Split-Flap Remote</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container controller-container">
+        <h1 class="controller-title">Split-Flap Remote</h1>
+        <p id="roomError" class="room-error" hidden>
+            Invalid or missing room. Please rescan the QR code on the display.
+        </p>
+
+        <div class="controls">
+            <textarea
+                id="textInput"
+                placeholder="Enter text to display..."
+                rows="4"
+            ></textarea>
+            <button id="displayBtn">Display</button>
+            <button id="randomBtn">Random Quote</button>
+        </div>
+    </div>
+
+    <script type="module" src="control.js"></script>
+</body>
+</html>
+
+
