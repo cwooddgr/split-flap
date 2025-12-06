@@ -301,9 +301,7 @@ button {
     border-radius: 10px;
     cursor: pointer;
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
-    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.35);
     letter-spacing: 0.3px;
     flex: 1;
     min-width: 140px;
@@ -316,20 +314,46 @@ button:hover {
 
 button:active {
     transform: translateY(-1px);
-    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.35);
+}
+
+/* Remote buttons: distinct but harmonious gradients */
+#displayBtn {
+    background: linear-gradient(135deg, #3b4a6b 0%, #6c7fa8 100%); /* muted slate / steel blue */
+    box-shadow: 0 3px 12px rgba(59, 74, 107, 0.35);
+}
+
+#displayBtn:hover {
+    box-shadow: 0 6px 18px rgba(59, 74, 107, 0.45);
+}
+
+#displayBtn:active {
+    box-shadow: 0 3px 12px rgba(59, 74, 107, 0.35);
 }
 
 #randomBtn {
-    background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-    box-shadow: 0 4px 16px rgba(250, 112, 154, 0.35);
+    background: linear-gradient(135deg, #2f6f6d 0%, #6aa7a3 100%); /* desaturated teal */
+    box-shadow: 0 3px 12px rgba(47, 111, 109, 0.4);
 }
 
 #randomBtn:hover {
-    box-shadow: 0 8px 24px rgba(250, 112, 154, 0.45);
+    box-shadow: 0 6px 18px rgba(47, 111, 109, 0.5);
 }
 
 #randomBtn:active {
-    box-shadow: 0 4px 16px rgba(250, 112, 154, 0.35);
+    box-shadow: 0 3px 12px rgba(47, 111, 109, 0.4);
+}
+
+#christmasBtn {
+    background: linear-gradient(135deg, #7c2b33 0%, #b6464f 100%); /* muted cranberry red */
+    box-shadow: 0 3px 12px rgba(124, 43, 51, 0.45);
+}
+
+#christmasBtn:hover {
+    box-shadow: 0 6px 18px rgba(124, 43, 51, 0.55);
+}
+
+#christmasBtn:active {
+    box-shadow: 0 3px 12px rgba(124, 43, 51, 0.45);
 }
 
 /* Controller page specifics */
