@@ -62,6 +62,7 @@ if (audioPromptEl) {
 
     // QR code
     const qrElement = document.getElementById('qrcode');
+    const qrContainer = document.getElementById('qr-container');
     if (qrElement && window.QRCode) {
         const controlUrl = new URL('control.html', window.location.href);
         controlUrl.searchParams.set('room', roomId);
@@ -78,6 +79,13 @@ if (audioPromptEl) {
             colorLight: '#ffffff',
             correctLevel: window.QRCode.CorrectLevel.M,
         });
+
+        // Allow user to hide the QR overlay with a single tap/click
+        if (qrContainer) {
+            qrContainer.addEventListener('click', () => {
+                qrContainer.style.display = 'none';
+            });
+        }
     }
 
     // Listen to Firestore document for this room

@@ -331,6 +331,17 @@ button:active {
     font-size: 14px;
 }
 
+.remote-qr-wrapper {
+    margin-top: 20px;
+    display: flex;
+    justify-content: center;
+}
+
+#remote-qrcode {
+    width: 72px;
+    height: 72px;
+}
+
 
 @media (max-width: 768px) {
     body {
