@@ -1,6 +1,22 @@
 import { db, doc, onSnapshot, ensureSignedIn } from './firebase-init.js';
 import { SplitFlapDisplay } from './splitflap.js';
 
+// Small-screen handling: show a simple message instead of the display UI
+const SMALL_SCREEN_MAX_WIDTH = 768; // adjust threshold if you like
+const isSmallScreen = window.innerWidth <= SMALL_SCREEN_MAX_WIDTH;
+
+if (isSmallScreen) {
+    const displayContainer = document.querySelector('.display-container');
+    const audioPromptEl = document.getElementById('audioPrompt');
+    const qrContainer = document.getElementById('qr-container');
+    const smallScreenMessageEl = document.getElementById('smallScreenMessage');
+
+    if (displayContainer) displayContainer.style.display = 'none';
+    if (audioPromptEl) audioPromptEl.style.display = 'none';
+    if (qrContainer) qrContainer.style.display = 'none';
+    if (smallScreenMessageEl) smallScreenMessageEl.classList.remove('hidden');
+}
+
 const ROOM_STORAGE_KEY = 'splitflapRoomId';
 
 function generateRoomId(length = 6) {

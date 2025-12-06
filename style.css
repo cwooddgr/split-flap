@@ -214,6 +214,35 @@ body {
     display: none;
 }
 
+/* Display: small-screen message overlay */
+#smallScreenMessage {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto;
+    background: transparent;
+    z-index: 90; /* similar layer as audio prompt */
+}
+
+#smallScreenMessage span {
+    margin-bottom: 0;
+    padding: 8px 16px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.7);
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    backdrop-filter: blur(14px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
+}
+
+#smallScreenMessage.hidden {
+    display: none;
+}
+
 /* Display page QR overlay */
 #qr-container {
     position: fixed;
