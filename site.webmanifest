@@ -1,6 +1,6 @@
 {
-  "name": "MyWebSite",
-  "short_name": "MySite",
+  "name": "Split-Flap",
+  "short_name": "Split-Flap",
   "icons": [
     {
       "src": "/split-flap/web-app-manifest-192x192.png",
