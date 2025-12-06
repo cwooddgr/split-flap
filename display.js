@@ -37,7 +37,7 @@ const display = new SplitFlapDisplay('displayBoard', 21, 6);
 // Default message shown when the display first loads,
 // animated in the same way as if it were sent from the remote.
 const DEFAULT_WELCOME_TEXT =
-    'WELCOME TO SPLIT-FLAP\n\nSCAN THE QR CODE WITH YOUR PHONE TO CHANGE THIS MESSAGE';
+    '\n\nWELCOME TO SPLIT-FLAP';
 
 // Subtle overlay to prompt the user to enable sound with a single tap
 const audioPromptEl = document.getElementById('audioPrompt');
