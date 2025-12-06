@@ -46,8 +46,9 @@ window.resetSplitflapRoomId = function () {
 
 const roomId = getOrCreateRoomId();
 
-// Initialize split-flap display
-const display = new SplitFlapDisplay('displayBoard', 22, 4);
+// Initialize split-flap display (cols, rows)
+// Using 20x6 to make cells larger and use more vertical space
+const display = new SplitFlapDisplay('displayBoard', 20, 6);
 
 // Subtle overlay to prompt the user to enable sound with a single tap
 const audioPromptEl = document.getElementById('audioPrompt');

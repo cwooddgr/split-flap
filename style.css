@@ -11,7 +11,7 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: 40px 20px;
+    padding: 24px 24px;
     margin: 0;
     overflow-x: hidden;
 }
@@ -56,8 +56,8 @@ body {
 }
 
 .flap-container {
-    width: clamp(20px, 3.8vw, 50px);
-    height: clamp(28px, 5.3vw, 70px);
+    width: clamp(20px, 4.2vw, 60px);
+    height: clamp(32px, 6vw, 80px);
     position: relative;
     perspective: 1000px;
 }
@@ -262,8 +262,8 @@ body {
 }
 
 #qrcode {
-    width: 72px;
-    height: 72px;
+    width: 112px;
+    height: 112px;
     background: #ffffff;
     border-radius: 8px;
 }
@@ -393,6 +393,17 @@ button:active {
 #remote-qrcode {
     width: 72px;
     height: 72px;
+}
+
+
+@media (min-width: 1400px) {
+    body {
+        padding: 16px 24px;
+    }
+
+    .display-container {
+        padding-bottom: 80px;
+    }
 }
 
 
