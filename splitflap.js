@@ -290,7 +290,7 @@ class SplitFlapDisplay {
 
             // Continue sequence
             this.flipSequence(row, col, totalSteps, currentStep + 1, animationId);
-        }, 50);
+        }, 100);
     }
 
     clear() {
