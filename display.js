@@ -17,8 +17,6 @@ if (isSmallScreen) {
     if (smallScreenMessageEl) smallScreenMessageEl.classList.remove('hidden');
 }
 
-const ROOM_STORAGE_KEY = 'splitflapRoomId';
-
 function generateRoomId(length = 6) {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let id = '';
@@ -28,27 +26,18 @@ function generateRoomId(length = 6) {
     return id;
 }
 
-function getOrCreateRoomId() {
-    let roomId = localStorage.getItem(ROOM_STORAGE_KEY);
-    if (!roomId) {
-        roomId = generateRoomId(6 + Math.floor(Math.random() * 3)); // 6–8 chars
-        localStorage.setItem(ROOM_STORAGE_KEY, roomId);
-    }
-    return roomId;
-}
-
-// Dev helper to reset the room during development.
-// Call window.resetSplitflapRoomId() from the console.
-window.resetSplitflapRoomId = function () {
-    localStorage.removeItem(ROOM_STORAGE_KEY);
-    window.location.reload();
-};
-
-const roomId = getOrCreateRoomId();
+// Always generate a fresh room id on each page load so a refresh
+// effectively "disconnects" old remotes and starts a new session.
+const roomId = generateRoomId(6 + Math.floor(Math.random() * 3)); // 6–8 chars
 
 // Initialize split-flap display (cols, rows)
-// Using 20x6 to make cells larger and use more vertical space
-const display = new SplitFlapDisplay('displayBoard', 20, 6);
+// Using 21x6 to make cells larger and use more vertical space
+const display = new SplitFlapDisplay('displayBoard', 21, 6);
+
+// Default message shown when the display first loads,
+// animated in the same way as if it were sent from the remote.
+const DEFAULT_WELCOME_TEXT =
+    'WELCOME TO SPLIT-FLAP\n\nSCAN THE QR CODE WITH YOUR PHONE TO CHANGE THIS MESSAGE';
 
 // Subtle overlay to prompt the user to enable sound with a single tap
 const audioPromptEl = document.getElementById('audioPrompt');
@@ -123,5 +112,8 @@ if (audioPromptEl) {
             console.error('Error listening to room document', error);
         }
     );
+
+    // Show a default welcome message until a remote sends text
+    display.setText(DEFAULT_WELCOME_TEXT);
 })();
 
