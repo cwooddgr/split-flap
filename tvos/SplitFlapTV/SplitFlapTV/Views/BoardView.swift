@@ -42,6 +42,7 @@ private struct TileView: View {
     @State private var isFlipping: Bool = false
     @State private var flipRotation: Double = 0
     @State private var animationTask: Task<Void, Never>?
+    @State private var animationId: Int = 0
 
     var body: some View {
         GeometryReader { geometry in
@@ -95,16 +96,22 @@ private struct TileView: View {
     }
     
     private func startAnimation(to targetChar: Character) {
-        // Cancel any existing animation
+        // Cancel any existing animation task and bump the animation id so
+        // any in-flight sequences know they are obsolete.
         animationTask?.cancel()
-        
+        animationId &+= 1
+        let currentId = animationId
+
         animationTask = Task { @MainActor in
-            await animateSequence(to: targetChar)
+            await animateSequence(to: targetChar, animationId: currentId)
         }
     }
     
     @MainActor
-    private func animateSequence(to targetChar: Character) async {
+    private func animateSequence(to targetChar: Character, animationId: Int) async {
+        // If a newer animation has started, abort immediately.
+        guard animationId == self.animationId else { return }
+
         guard let targetIndex = CHARSET.firstIndex(of: targetChar) else {
             displayChar = targetChar
             return
@@ -120,6 +127,9 @@ private struct TileView: View {
         if steps == 0 { return }
 
         for _ in 0..<steps {
+            // Check again at the start of each step for newer animations.
+            guard animationId == self.animationId else { return }
+
             if Task.isCancelled { return }
 
             let nextIndex = (currentIndex + 1) % CHARSET.count
@@ -138,6 +148,7 @@ private struct TileView: View {
             try? await Task.sleep(nanoseconds: 50_000_000)
 
             if Task.isCancelled { return }
+            guard animationId == self.animationId else { return }
 
             // Commit to the next character and reset the flip
             displayChar = nextChar
@@ -178,7 +189,7 @@ private struct HalfTileView: View {
             
             // Text (positioned to show correct half)
             Text(String(character))
-                .font(.system(size: 32, weight: .semibold, design: .monospaced))
+                .font(.system(size: 50, weight: .semibold, design: .monospaced))
                 .foregroundColor(.white)
                 .frame(width: 60, height: 80)
                 .offset(y: half == .top ? 20 : -20)
