@@ -246,8 +246,8 @@ body {
 /* Display page QR overlay */
 #qr-container {
     position: fixed;
-    right: 52px;
-    bottom: 52px;
+    right: 24px;
+    bottom: 24px;
     display: flex;
     flex-direction: row;
     align-items: center;

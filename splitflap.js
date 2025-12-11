@@ -180,24 +180,60 @@ class SplitFlapDisplay {
             text = String(text ?? '');
         }
 
-        // Wrap text at word boundaries
+        // Wrap text at word boundaries into lines
         let lines = this.wrapText(text, this.cols);
 
         // Limit to available rows
-        lines = lines.slice(0, this.rows);
-
-        // Pad to required number of rows
-        while (lines.length < this.rows) {
-            lines.push('');
+        if (lines.length > this.rows) {
+            lines = lines.slice(0, this.rows);
         }
 
+        // Compute horizontal centering based on the widest line
+        const contentWidths = lines.map((line) =>
+            line.replace(/\s+$/u, '').length
+        );
+        const maxContentWidth =
+            contentWidths.length > 0
+                ? Math.max(...contentWidths)
+                : 0;
+        const horizontalMargin = Math.max(
+            0,
+            Math.floor((this.cols - maxContentWidth) / 2)
+        );
+
+        // Compute vertical centering (blank rows above and below)
+        const blankRows = this.rows - lines.length;
+        const topBlank = blankRows > 0 ? Math.floor(blankRows / 2) : 0;
+        const bottomBlank = blankRows > 0 ? blankRows - topBlank : 0;
+
+        const centeredLines = [];
+        for (let i = 0; i < topBlank; i++) {
+            centeredLines.push('');
+        }
+        centeredLines.push(...lines);
+        for (let i = 0; i < bottomBlank; i++) {
+            centeredLines.push('');
+        }
+
+        // Ensure we have exactly the number of display rows
+        const finalLines = centeredLines.slice(0, this.rows);
+
         // Process each line
-        lines.forEach((line, rowIndex) => {
-            // Pad or truncate line to fit display
-            line = line.toUpperCase().padEnd(this.cols, ' ').substring(0, this.cols);
+        finalLines.forEach((line, rowIndex) => {
+            // Uppercase for display
+            let upper = line.toUpperCase();
+
+            // Respect existing trailing spaces in user text only up to content width
+            const trimmedRight = upper.replace(/\s+$/u, '');
+            const maxContentCols = Math.max(this.cols - horizontalMargin, 0);
+            const content = trimmedRight.substring(0, maxContentCols);
+
+            // Build a line that is left-justified within a horizontally centered block
+            let displayLine = ''.padEnd(horizontalMargin, ' ') + content;
+            displayLine = displayLine.padEnd(this.cols, ' ');
 
             // Trigger animation for each flap in this row
-            line.split('').forEach((char, colIndex) => {
+            displayLine.split('').forEach((char, colIndex) => {
                 if (!CHARSET.includes(char)) {
                     char = ' ';
                 }

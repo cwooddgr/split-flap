@@ -34,10 +34,9 @@ const roomId = generateRoomId(6 + Math.floor(Math.random() * 3)); // 6–8 chars
 // Using 21x6 to make cells larger and use more vertical space
 const display = new SplitFlapDisplay('displayBoard', 21, 6);
 
-// Default message shown when the display first loads,
-// animated in the same way as if it were sent from the remote.
-const DEFAULT_WELCOME_TEXT =
-    '\n\nWELCOME TO SPLIT-FLAP';
+// Default message placeholder for the display on load.
+// Currently empty so the board starts blank, but kept for easy future tweaks.
+const DEFAULT_WELCOME_TEXT = '';
 
 // Subtle overlay to prompt the user to enable sound with a single tap
 const audioPromptEl = document.getElementById('audioPrompt');
