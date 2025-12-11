@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>API_KEY</key>
+	<string>AIzaSyAE3kx_W7pqYx51q1cJj6P18w_mNQmUyks</string>
+	<key>GCM_SENDER_ID</key>
+	<string>213114555372</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.cwood.SplitFlapTV</string>
+	<key>PROJECT_ID</key>
+	<string>split-flap-ff40a</string>
+	<key>STORAGE_BUCKET</key>
+	<string>split-flap-ff40a.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:213114555372:ios:45026d00fb30d3ef658ec9</string>
+</dict>
+</plist>
