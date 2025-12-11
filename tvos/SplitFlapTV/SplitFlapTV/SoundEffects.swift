@@ -10,6 +10,7 @@ final class FlipSoundPlayer {
     private let engine = AVAudioEngine()
     private let player = AVAudioPlayerNode()
     private var buffer: AVAudioPCMBuffer?
+    private var outputFormat: AVAudioFormat?
 
     private init() {
         setupEngine()
@@ -19,7 +20,10 @@ final class FlipSoundPlayer {
     private func setupEngine() {
         let mainMixer = engine.mainMixerNode
         engine.attach(player)
-        engine.connect(player, to: mainMixer, format: nil)
+        // Use the mixer’s output format so our buffer matches its channel count
+        let format = mainMixer.outputFormat(forBus: 0)
+        engine.connect(player, to: mainMixer, format: format)
+        outputFormat = format
 
         do {
             try engine.start()
@@ -29,16 +33,12 @@ final class FlipSoundPlayer {
     }
 
     private func createClickBuffer() {
-        let sampleRate: Double = 44_100
+        // Use the engine / mixer format so channel count and sample rate match
+        guard let format = outputFormat else { return }
+
+        let sampleRate = format.sampleRate
         let duration: Double = 0.03 // 30 ms
         let frameCount = AVAudioFrameCount(sampleRate * duration)
-
-        guard let format = AVAudioFormat(
-            standardFormatWithSampleRate: sampleRate,
-            channels: 1
-        ) else {
-            return
-        }
 
         guard let buffer = AVAudioPCMBuffer(
             pcmFormat: format,
@@ -48,13 +48,21 @@ final class FlipSoundPlayer {
         }
 
         buffer.frameLength = frameCount
-        guard let channelData = buffer.floatChannelData?.pointee else { return }
+        guard let channelData = buffer.floatChannelData else { return }
 
-        // Generate decaying noise similar to the JS implementation
-        for i in 0..<Int(frameCount) {
-            let t = Double(i)
-            let decay = exp(-t / (Double(frameCount) * 0.1))
-            channelData[i] = Float.random(in: -1...1) * Float(decay) * 0.5
+        // Generate a short, clean "click": a few cycles of a decaying sine wave
+        // at a fairly high frequency so it reads as a tick rather than a tone.
+        let channels = Int(format.channelCount)
+        let frequency: Double = 2500 // Hz
+
+        for ch in 0..<channels {
+            let channel = channelData[ch]
+            for i in 0..<Int(frameCount) {
+                let t = Double(i) / sampleRate
+                let envelope = exp(-t / 0.003) // very fast decay (~3 ms)
+                let sample = sin(2.0 * .pi * frequency * t) * envelope * 0.5
+                channel[i] = Float(sample)
+            }
         }
 
         self.buffer = buffer

@@ -140,6 +140,9 @@ private struct TileView: View {
             isFlipping = true
             flipRotation = 0
 
+            // Play click sound for this flap, mirroring the web app behavior
+            FlipSoundPlayer.shared.playClick()
+
             withAnimation(.easeInOut(duration: 0.05)) {
                 flipRotation = -180
             }
