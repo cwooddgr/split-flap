@@ -167,12 +167,19 @@ if (!roomId || !isValidRoom(roomId)) {
         if (!textInput) return;
         const text = textInput.value || '';
 
+        // Set a rolling expiration so old rooms are cleaned up automatically
+        // by Firestore TTL. We keep each room alive for 7 days after the last
+        // update. The TTL policy should target the `expiresAt` field.
+        const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+        const expiresAt = new Date(Date.now() + WEEK_MS);
+
         try {
             await setDoc(
                 roomRef,
                 {
                     text,
                     updatedAt: serverTimestamp(),
+                    expiresAt,
                     source,
                 },
                 { merge: true }
