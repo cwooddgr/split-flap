@@ -11,6 +11,7 @@ final class FlipSoundPlayer {
     private let player = AVAudioPlayerNode()
     private var buffer: AVAudioPCMBuffer?
     private var outputFormat: AVAudioFormat?
+    private var lastPlayTime: TimeInterval = 0
 
     private init() {
         setupEngine()
@@ -70,6 +71,14 @@ final class FlipSoundPlayer {
 
     func playClick() {
         guard let buffer = buffer else { return }
+
+        // Throttle to avoid overwhelming the Apple TV with too many clicks.
+        // Limit to at most one click every 20ms (~50 clicks/second).
+        let now = CACurrentMediaTime()
+        if now - lastPlayTime < 0.02 {
+            return
+        }
+        lastPlayTime = now
 
         // Schedule a short buffer; let the player run continuously
         player.scheduleBuffer(buffer, at: nil, options: .interrupts, completionHandler: nil)

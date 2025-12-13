@@ -1,20 +1,33 @@
 
 import SwiftUI
+import UIKit
 
 struct ContentView: View {
-    // Temporary sample data; used as a fallback before Firestore data arrives.
-    private let sampleConfig = BoardConfig(cols: 21, rows: 6)
-    private let sampleState = RoomState(
-        text: "WELCOME TO\nSPLIT-FLAP TV",
-        source: "sample",
-        updatedAt: nil
-    )
+    /// Random room id generated once per app launch, mirroring the web display.
+    /// Uses 6–8 characters from A–Z0–9, just like `generateRoomId` in display.js.
+    private static let initialRoomId: String = {
+        let chars = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+        let length = 6 + Int.random(in: 0..<3) // 6–8 chars
+        var id = ""
+        for _ in 0..<length {
+            if let ch = chars.randomElement() {
+                id.append(ch)
+            }
+        }
+        return id
+    }()
 
-    // TODO: Replace this with a real room id (e.g., one shown on the web display).
-    @StateObject private var viewModel = RoomViewModel(roomId: "ABC123")
+    // Board configuration matches the web display (21x6).
+    // We no longer show a default message; the board starts blank until
+    // Firestore delivers real data for the current room.
+    private let sampleConfig = BoardConfig(cols: 21, rows: 6)
+
+    // Room id is generated randomly once per app launch, like the web display.
+    @StateObject private var viewModel = RoomViewModel(roomId: ContentView.initialRoomId)
+    @State private var isQRCodeHidden = false
 
     private var effectiveText: String {
-        viewModel.state?.text ?? sampleState.text
+        viewModel.state?.text ?? ""
     }
 
     // Base URL of the deployed web app (display/remote).
@@ -46,10 +59,26 @@ struct ContentView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
 
             // QR code anchored in the bottom-right corner.
-            if let controlURLString {
-                QRCodeView(text: controlURLString, size: 80)
+            // We only show it after RoomViewModel has finished auth and
+            // attached the Firestore listener (viewModel.isReady == true).
+            if let controlURLString, !isQRCodeHidden, viewModel.isReady {
+                QRCodeView(text: controlURLString, size: 160)
                     .padding(40)
             }
+        }
+        // On tvOS, treat any remote tap (select press on the focused area)
+        // as a request to hide the QR code, mirroring the web app's tap-to-hide.
+        .focusable(true)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            isQRCodeHidden = true
+        }
+        // Keep the Apple TV from sleeping/screensaver while this view is visible.
+        .onAppear {
+            UIApplication.shared.isIdleTimerDisabled = true
+        }
+        .onDisappear {
+            UIApplication.shared.isIdleTimerDisabled = false
         }
     }
 }

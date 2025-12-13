@@ -84,7 +84,7 @@ private struct TileView: View {
             }
         }
         .frame(width: 60, height: 80)
-        .onChange(of: character) { newChar in
+        .onChange(of: character) { _, newChar in
             if newChar != displayChar {
                 startAnimation(to: newChar)
             }
@@ -140,15 +140,17 @@ private struct TileView: View {
             isFlipping = true
             flipRotation = 0
 
-            // Play click sound for this flap, mirroring the web app behavior
+            // Play a (throttled) click sound for this flip step.
             FlipSoundPlayer.shared.playClick()
 
-            withAnimation(.easeInOut(duration: 0.05)) {
+            // Flip animation duration shortened to 25ms to keep overall
+            // per-step timing around 50ms.
+            withAnimation(.easeInOut(duration: 0.025)) {
                 flipRotation = -180
             }
 
-            // Wait for the flip to finish (50ms), matching the web timing
-            try? await Task.sleep(nanoseconds: 50_000_000)
+            // Wait briefly for the flip to finish (~25ms)
+            try? await Task.sleep(nanoseconds: 25_000_000)
 
             if Task.isCancelled { return }
             guard animationId == self.animationId else { return }
@@ -158,8 +160,9 @@ private struct TileView: View {
             isFlipping = false
             flipRotation = 0
 
-            // Brief pause before the next flip (50ms), matching the web
-            try? await Task.sleep(nanoseconds: 50_000_000)
+            // Brief pause before the next flip (~25ms) so overall step timing
+            // is about 50ms instead of the previous 100ms.
+            try? await Task.sleep(nanoseconds: 25_000_000)
 
             currentIndex = nextIndex
         }

@@ -38,7 +38,7 @@ enum BoardLayout {
 
         // 6. Build display lines with horizontal margin and padding
         return finalLines.map { line in
-            var upper = line.uppercased()
+            let upper = line.uppercased()
 
             // Respect existing trailing spaces only up to content width
             let trimmedRight = rtrim(upper)
@@ -67,7 +67,7 @@ enum BoardLayout {
         var wrappedLines: [String] = []
 
         for lineSub in inputLines {
-            var line = String(lineSub)
+            let line = String(lineSub)
 
             // If line fits, use it as-is
             if line.count <= maxCols {
