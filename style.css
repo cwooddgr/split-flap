@@ -316,44 +316,44 @@ button:active {
     transform: translateY(-1px);
 }
 
-/* Remote buttons: distinct but harmonious gradients */
+/* Remote buttons: subtle, modern color scheme */
 #displayBtn {
-    background: linear-gradient(135deg, #3b4a6b 0%, #6c7fa8 100%); /* muted slate / steel blue */
-    box-shadow: 0 3px 12px rgba(59, 74, 107, 0.35);
+    background: linear-gradient(135deg, #3d4f5f 0%, #5a7186 100%); /* slate blue */
+    box-shadow: 0 3px 12px rgba(61, 79, 95, 0.4);
 }
 
 #displayBtn:hover {
-    box-shadow: 0 6px 18px rgba(59, 74, 107, 0.45);
+    box-shadow: 0 6px 18px rgba(61, 79, 95, 0.5);
 }
 
 #displayBtn:active {
-    box-shadow: 0 3px 12px rgba(59, 74, 107, 0.35);
+    box-shadow: 0 3px 12px rgba(61, 79, 95, 0.4);
 }
 
 #randomBtn {
-    background: linear-gradient(135deg, #2f6f6d 0%, #6aa7a3 100%); /* desaturated teal */
-    box-shadow: 0 3px 12px rgba(47, 111, 109, 0.4);
+    background: linear-gradient(135deg, #2d5a5a 0%, #4a7c7c 100%); /* muted teal */
+    box-shadow: 0 3px 12px rgba(45, 90, 90, 0.4);
 }
 
 #randomBtn:hover {
-    box-shadow: 0 6px 18px rgba(47, 111, 109, 0.5);
+    box-shadow: 0 6px 18px rgba(45, 90, 90, 0.5);
 }
 
 #randomBtn:active {
-    box-shadow: 0 3px 12px rgba(47, 111, 109, 0.4);
+    box-shadow: 0 3px 12px rgba(45, 90, 90, 0.4);
 }
 
-#christmasBtn {
-    background: linear-gradient(135deg, #7c2b33 0%, #b6464f 100%); /* muted cranberry red */
-    box-shadow: 0 3px 12px rgba(124, 43, 51, 0.45);
+#funnyBtn {
+    background: linear-gradient(135deg, #7a5c1e 0%, #a67c28 100%); /* warm amber */
+    box-shadow: 0 3px 12px rgba(122, 92, 30, 0.4);
 }
 
-#christmasBtn:hover {
-    box-shadow: 0 6px 18px rgba(124, 43, 51, 0.55);
+#funnyBtn:hover {
+    box-shadow: 0 6px 18px rgba(122, 92, 30, 0.5);
 }
 
-#christmasBtn:active {
-    box-shadow: 0 3px 12px rgba(124, 43, 51, 0.45);
+#funnyBtn:active {
+    box-shadow: 0 3px 12px rgba(122, 92, 30, 0.4);
 }
 
 /* Controller page specifics */
