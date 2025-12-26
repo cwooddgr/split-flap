@@ -80,7 +80,7 @@ Current fields:
   - Existing values in the web app:
     - `"manual"` – user typed text and pressed Display (or Cmd/Ctrl+Enter).
     - `"random"` – Random Quote button.
-    - `"christmas"` – Christmas Quote button.
+    - `"funny"` – Funny Quote button.
 - `updatedAt` (timestamp, optional)
   - Firestore `Timestamp` set via `serverTimestamp()` in writes.
   - Used only for debugging / ordering; not required for rendering.

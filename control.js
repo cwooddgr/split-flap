@@ -45,7 +45,7 @@ if (!roomId || !isValidRoom(roomId)) {
     const textInput = document.getElementById('textInput');
     const displayBtn = document.getElementById('displayBtn');
     const randomBtn = document.getElementById('randomBtn');
-    const christmasBtn = document.getElementById('christmasBtn');
+    const funnyBtn = document.getElementById('funnyBtn');
 
     const randomTexts = [
         'IF YOU WANT\nTO FIND HAPPINESS\nFIND GRATITUDE',
@@ -86,81 +86,37 @@ if (!roomId || !isValidRoom(roomId)) {
         'IF PLAN A FAILS\nREMEMBER:\nTHERE ARE 25 MORE\nLETTERS',
     ];
 
-    // Christmas / holiday messages adapted from Shutterfly's
-    // "Christmas Card Sayings & Wishes" article:
-    // https://www.shutterfly.com/ideas/christmas-card-sayings/
-    const christmasTexts = [
-        // Short Christmas Card Messages
-        'Merry Christmas!',
-        'Happy holidays!',
-        'Wishing you joy and peace.',
-        'Warm holiday wishes.',
-        'Sending festive cheer.',
-        'Season’s greetings!',
-        'Have a wonderful Christmas.',
-        'Joy to you and yours.',
-        'Peace, love, and joy.',
-        'Cheers to the season.',
-
-        // Pet-Themed Christmas Card Messages
-        'Wishing you a paws-itively Merry Christmas!',
-        'Meowy Christmas and Happy Howl-idays!',
-        'Hope your holidays are filled with wagging tails and cozy cuddles.',
-        'Santa Paws is coming to town.',
-        'Fleece Navidad from our furry family to yours.',
-        'Sending holiday purrs and tail wags.',
-        'May your Christmas be furry and bright.',
-        'Happy holidays from our four-legged family members.',
-        'Paws and enjoy the holiday season.',
-        'From our home to yours, Merry Christmas—woofs and all.',
-
-        // Christmas Wishes for Family & Friends
-        'Wishing you all the love and warmth this Christmas.',
-        'Grateful for family like you this holiday season.',
-        'Merry Christmas to my favorite people—love you always.',
-        'Home is wherever family is. Merry Christmas!',
-        'Hoping your holiday is filled with everything that makes you smile.',
-        'Sending hugs, love, and holiday cheer.',
-        'Celebrating the season with gratitude for friends like you.',
-        'Wishing you a holiday full of family, fun, and good food.',
-        'Merry Christmas to the ones who make life brighter all year.',
-        'So lucky to call you family. Merry Christmas!',
-
-        // Business Holiday Card Greetings
-        'Wishing you a happy holiday season and a successful New Year.',
-        'Thank you for your partnership this year. Happy holidays!',
-        'Sending warm holiday wishes from our team to yours.',
-        'Grateful for your support—looking forward to working together in the New Year.',
-        'Season’s greetings and best wishes for continued success.',
-        'Cheers to a joyful holiday season and a prosperous year ahead.',
-        'Wishing you peace, joy, and good health this holiday season.',
-        'Happy holidays from all of us at [Your Company Name].',
-        'Thank you for a great year. Wishing you happiness and success in the coming year.',
-        'Looking forward to new opportunities in the New Year. Happy holidays!',
-
-        // Sentimental Christmas Card Sayings
-        'Wishing you a holiday season filled with love, peace, and beautiful memories.',
-        'The best gifts aren’t wrapped in paper but shared from the heart. Merry Christmas.',
-        'Thinking of you this Christmas and sending love across the miles.',
-        'May your holidays be filled with all the little things that make life special.',
-        'Hoping this Christmas brings you comfort, joy, and lasting happiness.',
-        'Grateful for your presence in my life this holiday season and always.',
-        'Wishing you quiet moments, warm gatherings, and lasting joy.',
-        'Celebrating the season with thoughts of love and appreciation for you.',
-        'Here’s to cherished memories and new traditions this Christmas.',
-        'Sending you heartfelt wishes for a peaceful and meaningful holiday.',
-
-        // Romantic Christmas Card Messages
-        'You make every season brighter. Merry Christmas, my love.',
-        'All I want for Christmas is you.',
-        'Wishing you a Christmas filled with love, laughter, and everything that makes life beautiful.',
-        'My favorite part of the holidays is sharing them with you.',
-        'Christmas feels magical because I get to spend it with you.',
-        'To the one who makes my heart feel merry and bright—Merry Christmas!',
-        'I’m grateful for every moment with you this season and always.',
-        'Here’s to cozy nights, festive lights, and sharing it all with you.',
-        'Sending all my love this Christmas and into the New Year.',
-        'Love is the greatest gift of all—Merry Christmas, darling!',
+    const funnyTexts = [
+        'MY WALLET IS LIKE\nAN ONION\nOPENING IT\nMAKES ME CRY',
+        'I FOLLOWED MY HEART\nAND IT LED ME\nTO THE FRIDGE',
+        'MY BRAIN HAS\nTOO MANY TABS OPEN',
+        'COMMON SENSE IS\nLIKE DEODORANT\nTHOSE WHO NEED IT\nNEVER USE IT',
+        'I PUT THE PRO\nIN PROCRASTINATE',
+        "I'M NOT SHORT\nI'M CONCENTRATED\nAWESOME",
+        'MY PATIENCE IS\nLIKE MY PHONE\nALWAYS LOW',
+        "I'M ON A SEAFOOD\nDIET\nI SEE FOOD\nAND I EAT IT",
+        'SILENCE IS GOLDEN\nUNLESS YOU HAVE\nKIDS\nTHEN IT IS\nSUSPICIOUS',
+        'I NEED A HUG\nE GLASS OF WINE',
+        "I'M NOT BOSSY\nI JUST KNOW WHAT\nYOU SHOULD BE DOING",
+        'MY HOUSEKEEPING\nSTYLE IS BEST\nDESCRIBED AS\nTHERE APPEARS TO\nHAVE BEEN A\nSTRUGGLE',
+        'ADULTING IS SOUP\nAND I AM A FORK',
+        "I DON'T NEED\nGOOGLE\nMY WIFE\nKNOWS EVERYTHING",
+        'I WHISPER WTF\nTO MYSELF\nAT LEAST 20 TIMES\nA DAY',
+        "I'M NOT LATE\nI'M JUST EARLY\nFOR TOMORROW",
+        'MY BED AND I\nHAVE A SPECIAL\nRELATIONSHIP\nWE ARE PERFECT\nFOR EACH OTHER',
+        "I'M SORRY FOR\nWHAT I SAID\nWHEN I WAS HUNGRY",
+        'SOME DAYS I AMAZE\nMYSELF\nOTHER DAYS I PUT\nMY KEYS IN THE\nFRIDGE',
+        "I CAN'T ADULT\nTODAY\nPLEASE DON'T\nMAKE ME ADULT",
+        'I HAVE CDO\nIT IS LIKE OCD\nBUT THE LETTERS\nARE IN ORDER\nAS THEY SHOULD BE',
+        "LIFE IS SHORT\nEAT DESSERT FIRST",
+        'MY LEVEL OF\nSARCASM DEPENDS ON\nYOUR LEVEL OF\nSTUPIDITY',
+        'I RUN ON\nCAFFEINE\nCHAOS\nAND CUSS WORDS',
+        "I'M NOT LAZY\nI AM IN\nENERGY SAVING MODE",
+        'EXERCISE?\nI THOUGHT YOU SAID\nEXTRA FRIES',
+        'HOME IS WHERE\nTHE WIFI\nCONNECTS\nAUTOMATICALLY',
+        "DON'T FOLLOW ME\nI RUN INTO WALLS",
+        'I TRIED TO BE\nNORMAL ONCE\nWORST TWO MINUTES\nOF MY LIFE',
+        'MY FAVORITE\nEXERCISE IS A\nCROSS BETWEEN\nA LUNGE AND A CRUNCH\nI CALL IT LUNCH',
     ];
 
     async function sendText(source) {
@@ -215,14 +171,14 @@ if (!roomId || !isValidRoom(roomId)) {
         });
     }
 
-    if (christmasBtn) {
-        christmasBtn.addEventListener('click', () => {
-            const christmasText =
-                christmasTexts[Math.floor(Math.random() * christmasTexts.length)];
+    if (funnyBtn) {
+        funnyBtn.addEventListener('click', () => {
+            const funnyText =
+                funnyTexts[Math.floor(Math.random() * funnyTexts.length)];
             if (textInput) {
-                textInput.value = christmasText;
+                textInput.value = funnyText;
             }
-            void sendText('christmas');
+            void sendText('funny');
         });
     }
 

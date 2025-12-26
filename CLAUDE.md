@@ -77,7 +77,7 @@ python -m http.server 8000
 // Collection: rooms, Document: {roomId}
 {
   "text": "MESSAGE HERE",           // required - raw text with \n for newlines
-  "source": "manual",               // optional - "manual" | "random" | "christmas"
+  "source": "manual",               // optional - "manual" | "random" | "funny"
   "updatedAt": "<serverTimestamp>", // optional - for debugging
   "expiresAt": "<timestamp>"        // optional - TTL cleanup (7 days)
 }

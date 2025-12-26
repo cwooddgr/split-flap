@@ -15,7 +15,7 @@ The display shows a grid of animated split‑flap cells; a separate “remote”
 - **Animated board**: Characters animate in a split‑flap style as the text changes.
 - **Fun presets**:
   - “Random Quote” button with humorous sayings.
-  - “Christmas Quote” button with holiday greetings and wishes.
+  - "Funny Quote" button with humorous one-liners.
 - **Automatic cleanup**:
   - Each room document stores an `expiresAt` field.
   - You can configure Firestore TTL to delete rooms after they are stale (e.g., 7 days).
@@ -67,7 +67,7 @@ The display shows a grid of animated split‑flap cells; a separate “remote”
      - `text`: the multi‑line text to display.
      - `updatedAt`: Firestore server timestamp.
      - `expiresAt`: JavaScript `Date` set to “now + 7 days” (for TTL cleanup).
-     - `source`: `"manual" | "random" | "christmas"`.
+     - `source`: `"manual" | "random" | "funny"`.
 
 3. **Display update**  
    - On any change to the room document, the display receives the new `text` and:
@@ -145,7 +145,7 @@ Then:
 
 1. Open `http://localhost:8000/index.html` on a big screen (iPad / desktop).  
 2. Scan the QR code with your phone; it should open `control.html?room=…`.  
-3. Type a message or use **Random Quote** / **Christmas Quote**, then press **Display**.  
+3. Type a message or use **Random Quote** / **Funny Quote**, then press **Display**.  
 4. Watch the split‑flap board animate to the new text.
 
 You can also host the files on any static host (Firebase Hosting, GitHub Pages, Netlify, etc.).
