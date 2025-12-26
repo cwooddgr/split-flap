@@ -46,6 +46,7 @@ if (!roomId || !isValidRoom(roomId)) {
     const displayBtn = document.getElementById('displayBtn');
     const randomBtn = document.getElementById('randomBtn');
     const funnyBtn = document.getElementById('funnyBtn');
+    const clearBtn = document.getElementById('clearBtn');
 
     const randomTexts = [
         'IF YOU WANT\nTO FIND HAPPINESS\nFIND GRATITUDE',
@@ -179,6 +180,15 @@ if (!roomId || !isValidRoom(roomId)) {
                 textInput.value = funnyText;
             }
             void sendText('funny');
+        });
+    }
+
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            if (textInput) {
+                textInput.value = '';
+            }
+            void sendText('clear');
         });
     }
 

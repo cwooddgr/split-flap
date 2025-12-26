@@ -356,6 +356,19 @@ button:active {
     box-shadow: 0 3px 12px rgba(122, 92, 30, 0.4);
 }
 
+#clearBtn {
+    background: linear-gradient(135deg, #6b3a3a 0%, #8f5050 100%); /* muted burgundy */
+    box-shadow: 0 3px 12px rgba(107, 58, 58, 0.4);
+}
+
+#clearBtn:hover {
+    box-shadow: 0 6px 18px rgba(107, 58, 58, 0.5);
+}
+
+#clearBtn:active {
+    box-shadow: 0 3px 12px rgba(107, 58, 58, 0.4);
+}
+
 /* Controller page specifics */
 .controller-container {
     max-width: 640px;
