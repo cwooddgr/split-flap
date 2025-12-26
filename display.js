@@ -93,24 +93,48 @@ if (audioPromptEl) {
         }
     }
 
-    // Listen to Firestore document for this room
+    // Listen to Firestore document for this room with automatic reconnection
     const roomRef = doc(db, 'rooms', roomId);
+    let unsubscribe = null;
 
-    onSnapshot(
-        roomRef,
-        (snapshot) => {
-            if (!snapshot.exists()) {
-                return;
-            }
-            const data = snapshot.data();
-            if (typeof data.text === 'string') {
-                display.setText(data.text);
-            }
-        },
-        (error) => {
-            console.error('Error listening to room document', error);
+    function subscribeToRoom() {
+        // Clean up any existing subscription
+        if (unsubscribe) {
+            unsubscribe();
         }
-    );
+
+        unsubscribe = onSnapshot(
+            roomRef,
+            (snapshot) => {
+                if (!snapshot.exists()) {
+                    return;
+                }
+                const data = snapshot.data();
+                if (typeof data.text === 'string') {
+                    display.setText(data.text);
+                }
+            },
+            async (error) => {
+                console.error('Error listening to room document', error);
+                // Wait a moment then try to reconnect
+                await new Promise((r) => setTimeout(r, 2000));
+                console.log('Attempting to reconnect to Firestore...');
+                await ensureSignedIn();
+                subscribeToRoom();
+            }
+        );
+    }
+
+    subscribeToRoom();
+
+    // Resubscribe when the page becomes visible again (e.g., after sleep/tab switch)
+    document.addEventListener('visibilitychange', async () => {
+        if (document.visibilityState === 'visible') {
+            console.log('Page visible, refreshing Firestore connection...');
+            await ensureSignedIn();
+            subscribeToRoom();
+        }
+    });
 
     // Show a default welcome message until a remote sends text
     display.setText(DEFAULT_WELCOME_TEXT);
