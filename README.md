@@ -1,6 +1,6 @@
 ## Flip Flap
 
-![Flip Flap display showing a message](flip-flap.png)
+![Flip Flap display showing a message](hero.png)
 
 A minimalist split‑flap style message board that runs on the web (for the display and remote) and on Apple TV (tvOS).  
 The display shows a grid of animated split‑flap cells; a separate “remote” page or the tvOS app sends text to show via Firebase.
