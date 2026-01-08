@@ -1,5 +1,24 @@
-import { db, doc, onSnapshot, ensureSignedIn } from './firebase-init.js';
+import { db, doc, onSnapshot, ensureSignedIn, forceTokenRefresh } from './firebase-init.js';
 import { SplitFlapDisplay } from './splitflap.js';
+
+// Debug logging helper with timestamps
+function debugLog(message, data = null) {
+    const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
+    if (data !== null) {
+        console.log(`[${timestamp}] ${message}`, data);
+    } else {
+        console.log(`[${timestamp}] ${message}`);
+    }
+}
+
+// Connection health tracking
+let lastServerSnapshotTime = null;
+let lastReconnectAttempt = null; // Prevent rapid reconnect attempts
+let retryDelay = 2000; // Start at 2 seconds, will increase exponentially
+const MAX_RETRY_DELAY = 30000; // Cap at 30 seconds
+const HEARTBEAT_INTERVAL = 5 * 60 * 1000; // 5 minutes
+const STALE_THRESHOLD = 10 * 60 * 1000; // 10 minutes - force reconnect if no server snapshot
+const RECONNECT_COOLDOWN = 10 * 60 * 1000; // 10 minutes - don't retry if we just tried
 
 // Small-screen handling: show a simple message instead of the display UI
 const SMALL_SCREEN_MAX_WIDTH = 768; // adjust threshold if you like
@@ -94,7 +113,6 @@ if (audioPromptEl) {
     }
 
     // Listen to Firestore document for this room with automatic reconnection
-    const roomRef = doc(db, 'rooms', roomId);
     let unsubscribe = null;
 
     function subscribeToRoom() {
@@ -103,22 +121,46 @@ if (audioPromptEl) {
             unsubscribe();
         }
 
+        // Create fresh document reference (important after Firestore reset)
+        const roomRef = doc(db, 'rooms', roomId);
+        debugLog(`Subscribing to room: ${roomId}`);
+
         unsubscribe = onSnapshot(
             roomRef,
             (snapshot) => {
-                if (!snapshot.exists()) {
+                const { fromCache, hasPendingWrites } = snapshot.metadata;
+                const exists = snapshot.exists();
+                const data = exists ? snapshot.data() : null;
+                const text = data && data.text ? data.text : '';
+                const textPreview = text ? text.substring(0, 30).replace(/\n/g, '\\n') : '(none)';
+
+                debugLog(`Snapshot received: exists=${exists}, fromCache=${fromCache}, hasPendingWrites=${hasPendingWrites}, text="${textPreview}${text.length > 30 ? '...' : ''}"`);
+
+                // Track server snapshots (not from cache)
+                if (!fromCache) {
+                    lastServerSnapshotTime = Date.now();
+                    retryDelay = 2000; // Reset retry delay on successful server connection
+                    debugLog('Server snapshot confirmed - connection healthy');
+                }
+
+                if (!exists) {
                     return;
                 }
-                const data = snapshot.data();
                 if (typeof data.text === 'string') {
                     display.setText(data.text);
                 }
             },
             async (error) => {
-                console.error('Error listening to room document', error);
-                // Wait a moment then try to reconnect
-                await new Promise((r) => setTimeout(r, 2000));
-                console.log('Attempting to reconnect to Firestore...');
+                debugLog('Error listening to room document:', error);
+
+                // Exponential backoff
+                debugLog(`Attempting reconnect in ${retryDelay}ms (attempt after error)`);
+                await new Promise((r) => setTimeout(r, retryDelay));
+
+                // Increase delay for next time, capped at max
+                retryDelay = Math.min(retryDelay * 2, MAX_RETRY_DELAY);
+
+                debugLog('Reconnecting to Firestore...');
                 await ensureSignedIn();
                 subscribeToRoom();
             }
@@ -127,11 +169,55 @@ if (audioPromptEl) {
 
     subscribeToRoom();
 
+    // Heartbeat: periodically check connection health and force reconnect if stale
+    setInterval(async () => {
+        const now = Date.now();
+        const timeSinceLastServer = lastServerSnapshotTime ? now - lastServerSnapshotTime : null;
+        const timeSinceLastReconnect = lastReconnectAttempt ? now - lastReconnectAttempt : null;
+        const minutesAgo = timeSinceLastServer ? Math.round(timeSinceLastServer / 60000) : 'never';
+
+        if (timeSinceLastServer === null) {
+            debugLog(`Heartbeat: no server snapshot received yet`);
+        } else if (timeSinceLastServer > STALE_THRESHOLD) {
+            // Check if we recently tried to reconnect - if so, wait for it to take effect
+            if (timeSinceLastReconnect !== null && timeSinceLastReconnect < RECONNECT_COOLDOWN) {
+                const cooldownRemaining = Math.round((RECONNECT_COOLDOWN - timeSinceLastReconnect) / 1000);
+                debugLog(`Heartbeat: connection stale but recently reconnected, waiting ${cooldownRemaining}s before retry`);
+            } else {
+                debugLog(`Heartbeat: last server snapshot ${minutesAgo}m ago - STALE, forcing token refresh and reconnect`);
+                lastReconnectAttempt = now;
+                await forceTokenRefresh();
+                subscribeToRoom();
+            }
+        } else {
+            debugLog(`Heartbeat: last server snapshot ${minutesAgo}m ago - connection OK`);
+        }
+    }, HEARTBEAT_INTERVAL);
+
+    debugLog('Heartbeat monitoring started (every 5 minutes)');
+
     // Resubscribe when the page becomes visible again (e.g., after sleep/tab switch)
     document.addEventListener('visibilitychange', async () => {
         if (document.visibilityState === 'visible') {
-            console.log('Page visible, refreshing Firestore connection...');
-            await ensureSignedIn();
+            const now = Date.now();
+            const timeSinceLastServer = lastServerSnapshotTime ? now - lastServerSnapshotTime : null;
+            const timeSinceLastReconnect = lastReconnectAttempt ? now - lastReconnectAttempt : null;
+
+            // Skip if we got a server snapshot recently (connection is working)
+            if (timeSinceLastServer !== null && timeSinceLastServer < 60000) {
+                debugLog('Page became visible, but got server snapshot recently - skipping');
+                return;
+            }
+
+            // Skip if we recently tried to reconnect
+            if (timeSinceLastReconnect !== null && timeSinceLastReconnect < RECONNECT_COOLDOWN) {
+                debugLog('Page became visible, but recently reconnected - skipping');
+                return;
+            }
+
+            debugLog('Page became visible, refreshing connection...');
+            lastReconnectAttempt = now;
+            await forceTokenRefresh();
             subscribeToRoom();
         }
     });

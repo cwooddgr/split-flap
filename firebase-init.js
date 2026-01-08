@@ -52,4 +52,33 @@ function ensureSignedIn() {
     });
 }
 
-export { db, doc, setDoc, onSnapshot, serverTimestamp, ensureSignedIn };
+// Try to refresh auth. Returns true if we should resubscribe.
+async function forceTokenRefresh() {
+    console.log('[Firebase] Attempting to refresh auth...');
+
+    try {
+        // Try token refresh first
+        if (auth.currentUser) {
+            await auth.currentUser.getIdToken(true);
+            console.log('[Firebase] Token refreshed successfully');
+        } else {
+            await signInAnonymously(auth);
+            console.log('[Firebase] Signed in anonymously');
+        }
+    } catch (err) {
+        // Token refresh often fails due to Safari ITP blocking securetoken.googleapis.com
+        // Fall back to anonymous sign-in
+        console.warn('[Firebase] Token refresh failed, trying anonymous sign-in:', err.message);
+        try {
+            await signInAnonymously(auth);
+            console.log('[Firebase] Signed in anonymously (fallback)');
+        } catch (signInErr) {
+            console.error('[Firebase] Anonymous sign-in also failed:', signInErr.message);
+            return false;
+        }
+    }
+
+    return true;
+}
+
+export { db, doc, setDoc, onSnapshot, serverTimestamp, ensureSignedIn, forceTokenRefresh };
