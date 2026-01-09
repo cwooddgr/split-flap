@@ -27,7 +27,7 @@ struct ContentView: View {
     @State private var isQRCodeHidden = false
 
     private var effectiveText: String {
-        viewModel.state?.text ?? ""
+        viewModel.state?.text ?? "Scan the QR code to change this message"
     }
 
     // Base URL of the deployed web app (display/remote).
