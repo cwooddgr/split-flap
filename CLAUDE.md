@@ -100,3 +100,32 @@ Character set: Space, A-Z, 0-9, common punctuation, smart quotes, degree symbol,
 - **Anonymous authentication** enabled
 - Web config in `firebase-init.js`
 - tvOS config via `GoogleService-Info.plist`
+
+### Firestore Security Rules
+
+The `rooms` collection must be explicitly allowed in your security rules. Without this, real-time listeners will fail silently:
+
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Split-flap rooms - authenticated users can read/write
+    match /rooms/{roomId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && request.resource.data.text is string
+        && request.resource.data.text.size() <= 10000;
+    }
+
+    // Deny all other access by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+```
+
+Key points:
+- `request.auth != null` allows anonymous auth (used by both web and tvOS)
+- Use `allow read` (not `allow get`) to support `onSnapshot()` real-time listeners
+- The catch-all deny rule blocks access to any other collections

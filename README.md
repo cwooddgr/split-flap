@@ -115,7 +115,35 @@ const firebaseConfig = {
 };
 ```
 
-4. Make sure your **Firestore rules** only allow access to the `rooms` collection as described in `docs/PROTOCOL.md` (for example, requiring authentication and restricting fields as needed).
+4. Configure your **Firestore security rules** (see below).
+
+---
+
+## Firestore Security Rules
+
+In Firebase Console → Firestore → Rules, add rules for the `rooms` collection. The app uses anonymous authentication, so rules must allow `request.auth != null`:
+
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Split-flap rooms - authenticated users can read/write
+    match /rooms/{roomId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && request.resource.data.text is string
+        && request.resource.data.text.size() <= 10000;
+    }
+
+    // Deny all other access by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+```
+
+**Important:** Use `allow read` (not separate `allow get`/`allow list`) to ensure real-time listeners work correctly.
 
 ---
 
@@ -201,7 +229,7 @@ This keeps your Firestore data size under control without manual cleanup.
 
 MIT License
 
-Copyright (c) 2025 Charlie Wood
+&copy; 2026 DGR Labs, LLC
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
