@@ -10,8 +10,8 @@ import FirebaseFirestore
 final class RoomViewModel: ObservableObject {
     @Published var state: RoomState?
     @Published var errorMessage: String?
-    /// Becomes true after we've successfully attached a Firestore listener for
-    /// this room (i.e., after auth + startListening have completed).
+    /// Becomes true after authentication succeeds, allowing the UI to display
+    /// the QR code immediately without waiting for Firestore connectivity.
     @Published var isReady: Bool = false
 
     let roomId: String
@@ -49,15 +49,14 @@ final class RoomViewModel: ObservableObject {
     }
 
     private func startListening() {
+        // Mark as ready immediately after auth succeeds - the QR code only
+        // needs the roomId, not Firestore connectivity.
+        isReady = true
+
         let db = Firestore.firestore()
 
         listener = db.collection("rooms").document(roomId)
             .addSnapshotListener { [weak self] snapshot, error in
-                // Mark the view model as ready as soon as we have a listener.
-                if let self = self, !self.isReady {
-                    self.isReady = true
-                }
-
                 DispatchQueue.main.async {
                     if let error = error {
                         self?.errorMessage = "Listen error: \(error.localizedDescription)"
