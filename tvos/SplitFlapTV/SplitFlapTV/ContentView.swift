@@ -31,8 +31,8 @@ struct ContentView: View {
     }
 
     // Base URL of the deployed web app (display/remote).
-    // Currently hosted at https://interestingtimes.blog/split-flap/
-    private let webBaseURLString = "https://interestingtimes.blog/split-flap/"
+    // Currently hosted at https://flipflap.dgrlabs.co/
+    private let webBaseURLString = "https://flipflap.dgrlabs.co/"
 
     private var controlURLString: String? {
         guard let baseURL = URL(string: webBaseURLString) else { return nil }
