@@ -88,6 +88,7 @@ The display shows a grid of animated split‑flap cells; a separate “remote”
 - A **Firebase project** with:
   - **Cloud Firestore** enabled (in Native mode).
   - **Firebase Authentication** enabled with **Anonymous** sign‑in.
+  - **Authorized domains** configured for your hosting domain (see below).
 - A **Google Cloud project** linked to your Firebase project (automatically created by Firebase).
 - Node not required: the web app is just static HTML/JS/CSS and can be hosted anywhere.
 - For tvOS:
@@ -144,6 +145,36 @@ service cloud.firestore {
 ```
 
 **Important:** Use `allow read` (not separate `allow get`/`allow list`) to ensure real-time listeners work correctly.
+
+---
+
+## Authorized Domains
+
+For anonymous authentication to work, your hosting domain must be authorized:
+
+1. Go to **Firebase Console → Authentication → Settings → Authorized domains**
+2. Click **Add domain**
+3. Add your domain (e.g., `yourdomain.com`)
+
+Without this, you'll see OAuth errors in the console and authentication will fail.
+
+---
+
+## API Key Restrictions
+
+If you add HTTP referrer restrictions to your API key, ensure your domain is included:
+
+1. Go to **Google Cloud Console → APIs & Services → Credentials**
+2. Click on your web API key
+3. Under **Application restrictions**, if set to "HTTP referrers":
+   - Add `yourdomain.com/*`
+   - Add `*.yourdomain.com/*` (for subdomains)
+   - Add `localhost/*` for local development
+4. Under **API restrictions**, ensure these APIs are allowed:
+   - Cloud Firestore API
+   - Identity Toolkit API
+
+Without correct referrer restrictions, Firestore real-time listeners will fail with CORS errors.
 
 ---
 

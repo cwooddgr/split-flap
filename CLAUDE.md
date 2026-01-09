@@ -98,6 +98,8 @@ Character set: Space, A-Z, 0-9, common punctuation, smart quotes, degree symbol,
 
 - **Cloud Firestore** enabled (Native mode)
 - **Anonymous authentication** enabled
+- **Authorized domains** configured (Firebase Console → Authentication → Settings → Authorized domains)
+- **API key** configured with correct referrer restrictions (Google Cloud Console → APIs & Services → Credentials)
 - Web config in `firebase-init.js`
 - tvOS config via `GoogleService-Info.plist`
 
