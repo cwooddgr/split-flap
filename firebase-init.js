@@ -13,6 +13,7 @@ import {
 import {
     getAuth,
     signInAnonymously,
+    signOut,
     onAuthStateChanged,
 } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
 
@@ -53,4 +54,15 @@ function ensureSignedIn() {
     });
 }
 
-export { db, doc, setDoc, getDoc, onSnapshot, serverTimestamp, ensureSignedIn };
+// Force a fresh anonymous sign-in by signing out first.
+// Use this when the auth token may have expired.
+async function forceReauthenticate() {
+    try {
+        await signOut(auth);
+    } catch (err) {
+        console.warn("Sign out failed (may already be signed out):", err);
+    }
+    return signInAnonymously(auth);
+}
+
+export { db, doc, setDoc, getDoc, onSnapshot, serverTimestamp, ensureSignedIn, forceReauthenticate };

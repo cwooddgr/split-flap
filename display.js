@@ -1,4 +1,4 @@
-import { db, doc, getDoc, onSnapshot, ensureSignedIn } from './firebase-init.js';
+import { db, doc, getDoc, onSnapshot, ensureSignedIn, forceReauthenticate } from './firebase-init.js';
 import { SplitFlapDisplay } from './splitflap.js';
 
 // Small-screen handling: show a simple message instead of the display UI
@@ -144,10 +144,10 @@ async function attemptReconnect() {
     }
 
     try {
-        // Re-authenticate (get fresh anonymous auth if needed)
-        debugLog('RECONNECT', 'Re-authenticating...');
-        await ensureSignedIn();
-        debugLog('RECONNECT', 'Re-authentication successful');
+        // Force fresh anonymous auth (sign out + sign in) to get a new token
+        debugLog('RECONNECT', 'Force re-authenticating (sign out + sign in)...');
+        await forceReauthenticate();
+        debugLog('RECONNECT', 'Force re-authentication successful');
 
         // Set up fresh listener
         debugLog('RECONNECT', 'Setting up new Firestore listener');
