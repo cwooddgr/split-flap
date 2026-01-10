@@ -6,6 +6,7 @@ import {
     getFirestore,
     doc,
     setDoc,
+    getDoc,
     onSnapshot,
     serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
@@ -52,4 +53,4 @@ function ensureSignedIn() {
     });
 }
 
-export { db, doc, setDoc, onSnapshot, serverTimestamp, ensureSignedIn };
+export { db, doc, setDoc, getDoc, onSnapshot, serverTimestamp, ensureSignedIn };

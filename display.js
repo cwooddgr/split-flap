@@ -1,4 +1,4 @@
-import { db, doc, onSnapshot, ensureSignedIn } from './firebase-init.js';
+import { db, doc, getDoc, onSnapshot, ensureSignedIn } from './firebase-init.js';
 import { SplitFlapDisplay } from './splitflap.js';
 
 // Small-screen handling: show a simple message instead of the display UI
@@ -42,6 +42,7 @@ const DEFAULT_WELCOME_TEXT = '';
 const HEALTH_CHECK_INTERVAL_MS = 120000; // Check every 2 minutes
 const OFFLINE_THRESHOLD_MS = 60000; // Consider offline if no server response for 60s
 let lastServerResponseTime = Date.now();
+let connectionEstablishedTime = null;
 let isConnected = true;
 let snapshotCount = 0;
 let serverResponseCount = 0;
@@ -70,6 +71,18 @@ debugLog('INIT', 'Health check system initialized', {
     OFFLINE_THRESHOLD_MS,
 });
 
+function formatDuration(ms) {
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    if (hours > 0) {
+        return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
+    } else if (minutes > 0) {
+        return `${minutes}m ${seconds % 60}s`;
+    }
+    return `${seconds}s`;
+}
+
 function setConnectionState(connected) {
     if (isConnected === connected) {
         debugLog('STATE', `Connection state unchanged: ${connected}`);
@@ -79,16 +92,38 @@ function setConnectionState(connected) {
     isConnected = connected;
     document.body.classList.toggle('disconnected', !connected);
     if (!connected) {
-        console.warn('Connection lost to Firebase');
+        const now = Date.now();
+        const timeSinceEstablished = connectionEstablishedTime ? now - connectionEstablishedTime : null;
+        const timeSinceLastUsed = now - lastServerResponseTime;
+
+        // Prominent, easily searchable connection lost message
+        console.error(`
+========================================
+CONNECTION LOST - ${new Date().toISOString()}
+========================================
+Time since connection established: ${timeSinceEstablished ? formatDuration(timeSinceEstablished) : 'N/A'}
+Time since last server response:   ${formatDuration(timeSinceLastUsed)}
+Connection established at:         ${connectionEstablishedTime ? new Date(connectionEstablishedTime).toISOString() : 'N/A'}
+Last server response at:           ${new Date(lastServerResponseTime).toISOString()}
+========================================
+        `);
+
         debugLog('STATE', 'CONNECTION LOST - Background turning red', {
             previousState,
             newState: connected,
+            timeSinceEstablishedMs: timeSinceEstablished,
+            timeSinceLastUsedMs: timeSinceLastUsed,
         });
     } else {
+        // Update connection established time on reconnect
+        if (!connectionEstablishedTime || previousState === false) {
+            connectionEstablishedTime = Date.now();
+        }
         console.log('Connection restored to Firebase');
         debugLog('STATE', 'CONNECTION RESTORED - Background returning to normal', {
             previousState,
             newState: connected,
+            connectionEstablishedTime: new Date(connectionEstablishedTime).toISOString(),
         });
     }
 }
@@ -166,6 +201,10 @@ function setupFirestoreListener() {
             // Track connection state via metadata
             if (!fromCache) {
                 lastServerResponseTime = Date.now();
+                if (!connectionEstablishedTime) {
+                    connectionEstablishedTime = Date.now();
+                    debugLog('SNAPSHOT', 'First server response - connection established');
+                }
                 debugLog('SNAPSHOT', 'Server response - updating lastServerResponseTime');
                 setConnectionState(true);
             } else {
@@ -196,18 +235,50 @@ function setupFirestoreListener() {
 
 function startHealthCheck() {
     debugLog('HEALTH', 'Starting health check interval');
-    setInterval(() => {
+    setInterval(async () => {
         const timeSinceLastResponse = Date.now() - lastServerResponseTime;
-        const isOverThreshold = timeSinceLastResponse > OFFLINE_THRESHOLD_MS;
-        debugLog('HEALTH', 'Health check tick', {
+        debugLog('HEALTH', 'Health check tick - performing active ping', {
             timeSinceLastResponseMs: timeSinceLastResponse,
             thresholdMs: OFFLINE_THRESHOLD_MS,
-            isOverThreshold,
-            willAttemptReconnect: isOverThreshold,
         });
-        if (isOverThreshold) {
-            setConnectionState(false);
-            attemptReconnect();
+
+        // Active ping: try to read the room document from the server
+        try {
+            const roomRef = doc(db, 'rooms', roomId);
+            const snapshot = await getDoc(roomRef);
+            const fromCache = snapshot.metadata.fromCache;
+
+            debugLog('HEALTH', 'Ping response received', {
+                fromCache,
+                exists: snapshot.exists(),
+            });
+
+            if (!fromCache) {
+                // Got a fresh server response - connection is alive
+                lastServerResponseTime = Date.now();
+                setConnectionState(true);
+                debugLog('HEALTH', 'Ping successful - connection confirmed alive');
+            } else {
+                // Only got cached data - server might be unreachable
+                debugLog('HEALTH', 'Ping returned cached data - checking threshold');
+                const updatedTimeSinceLastResponse = Date.now() - lastServerResponseTime;
+                if (updatedTimeSinceLastResponse > OFFLINE_THRESHOLD_MS) {
+                    debugLog('HEALTH', 'Over threshold after cache response - attempting reconnect');
+                    setConnectionState(false);
+                    attemptReconnect();
+                }
+            }
+        } catch (err) {
+            console.error('Health check ping failed:', err);
+            debugLog('HEALTH', 'Ping failed with error', {
+                errorMessage: err.message,
+                errorCode: err.code,
+            });
+            const updatedTimeSinceLastResponse = Date.now() - lastServerResponseTime;
+            if (updatedTimeSinceLastResponse > OFFLINE_THRESHOLD_MS) {
+                setConnectionState(false);
+                attemptReconnect();
+            }
         }
     }, HEALTH_CHECK_INTERVAL_MS);
 }
