@@ -2,25 +2,51 @@ import SwiftUI
 
 /// Character set matching the web app's CHARSET
 private let CHARSET: [Character] = Array(
-    " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.:!?-,;'\"()/@#$%&*+=<>[]{}|~‘’“”°–—…"
+    " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.:!?-,;'\"()/@#$%&*+=<>[]{}|~\u{2018}\u{2019}\u{201C}\u{201D}°–—…"
 )
 
-/// Board view that renders a grid of tiles from a message string.
-/// Uses BoardLayout to mirror the JavaScript implementation in splitflap.js
-/// (wrapping at word boundaries and centering the block of text).
+/// Advance a character one step through CHARSET toward the target.
+/// Returns the next character, or nil if already at target.
+private func advanceChar(_ current: Character, toward target: Character) -> Character? {
+    guard current != target else { return nil }
+
+    guard let currentIndex = CHARSET.firstIndex(of: current) else {
+        // Unknown character, snap to target
+        return target
+    }
+
+    let nextIndex = (currentIndex + 1) % CHARSET.count
+    return CHARSET[nextIndex]
+}
+
+/// Board view that renders a grid of split-flap tiles.
+/// Uses a centralized animation coordinator instead of per-tile async tasks.
+/// This dramatically improves performance by:
+/// - Running a single timer instead of 126 independent async loops
+/// - Batching all state updates into one array mutation per tick
+/// - Eliminating invisible 3D rotation animations
 struct BoardView: View {
     let config: BoardConfig
     let message: String
 
-    private var rows: [String] {
-        BoardLayout.layout(message: message, config: config)
+    /// The characters currently displayed on each tile.
+    /// This is the source of truth for what's rendered.
+    @State private var currentBoard: [[Character]] = []
+
+    /// The animation tick task - advances all tiles toward their targets.
+    @State private var animationTask: Task<Void, Never>?
+
+    /// Computed target board from the message.
+    private var targetBoard: [[Character]] {
+        let rows = BoardLayout.layout(message: message, config: config)
+        return rows.map { Array($0) }
     }
 
     var body: some View {
         VStack(spacing: 6) {
-            ForEach(Array(rows.enumerated()), id: \.offset) { _, line in
+            ForEach(Array(currentBoard.enumerated()), id: \.offset) { rowIndex, row in
                 HStack(spacing: 4) {
-                    ForEach(Array(line.enumerated()), id: \.offset) { _, char in
+                    ForEach(Array(row.enumerated()), id: \.offset) { colIndex, char in
                         TileView(character: char)
                     }
                 }
@@ -31,141 +57,106 @@ struct BoardView: View {
             RoundedRectangle(cornerRadius: 20)
                 .fill(Color(.sRGB, red: 0.17, green: 0.17, blue: 0.17, opacity: 1.0))
         )
+        .onAppear {
+            initializeBoard()
+        }
+        .onChange(of: message) { _, _ in
+            startAnimation()
+        }
+    }
+
+    /// Initialize the board with empty tiles on first appear.
+    private func initializeBoard() {
+        // Create empty board matching config dimensions
+        currentBoard = (0..<config.rows).map { _ in
+            Array(repeating: Character(" "), count: config.cols)
+        }
+        // Start animating toward the initial message
+        startAnimation()
+    }
+
+    /// Start (or restart) the animation loop toward the current target.
+    private func startAnimation() {
+        // Cancel any existing animation
+        animationTask?.cancel()
+
+        animationTask = Task { @MainActor in
+            await runAnimationLoop()
+        }
+    }
+
+    /// Main animation loop - ticks all tiles toward their targets.
+    @MainActor
+    private func runAnimationLoop() async {
+        let target = targetBoard
+
+        // Ensure board dimensions match
+        guard currentBoard.count == target.count else { return }
+
+        while !Task.isCancelled {
+            var anyChanged = false
+            var newBoard = currentBoard
+
+            // Advance each tile one step toward its target
+            for row in 0..<newBoard.count {
+                guard row < target.count else { continue }
+                for col in 0..<newBoard[row].count {
+                    guard col < target[row].count else { continue }
+
+                    let current = newBoard[row][col]
+                    let targetChar = target[row][col]
+
+                    if let next = advanceChar(current, toward: targetChar) {
+                        newBoard[row][col] = next
+                        anyChanged = true
+                    }
+                }
+            }
+
+            // If nothing changed, we're done
+            if !anyChanged {
+                break
+            }
+
+            // Commit the new board state (single batched update)
+            currentBoard = newBoard
+
+            // Play one click sound per tick
+            FlipSoundPlayer.shared.playClick()
+
+            // Wait before next tick (~50ms per step, matching web app feel)
+            try? await Task.sleep(nanoseconds: 50_000_000)
+        }
     }
 }
 
+/// A single split-flap tile - purely presentational, no animation logic.
 private struct TileView: View {
     let character: Character
-    
-    @State private var displayChar: Character = " "
-    @State private var flipChar: Character = " "
-    @State private var isFlipping: Bool = false
-    @State private var flipRotation: Double = 0
-    @State private var animationTask: Task<Void, Never>?
-    @State private var animationId: Int = 0
 
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                // Background
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(Color(.sRGB, white: 0.08, opacity: 1.0))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 4)
-                            .stroke(Color.black, lineWidth: 1)
-                    )
-                
-                // Static top half
-                VStack(spacing: 0) {
-                    HalfTileView(character: displayChar, half: .top)
-                    Spacer()
-                }
-                
-                // Static bottom half
-                VStack(spacing: 0) {
-                    Spacer()
-                    HalfTileView(character: displayChar, half: .bottom)
-                }
-                
-                // Flipping top half (animated)
-                if isFlipping {
-                    VStack(spacing: 0) {
-                        HalfTileView(character: flipChar, half: .top)
-                        Spacer()
-                    }
-                    .rotation3DEffect(
-                        .degrees(flipRotation),
-                        axis: (x: 1, y: 0, z: 0),
-                        anchor: .bottom,
-                        perspective: 0.3
-                    )
-                    .opacity(flipRotation < -160 ? 0 : 1)
-                }
+        ZStack {
+            // Background
+            RoundedRectangle(cornerRadius: 4)
+                .fill(Color(.sRGB, white: 0.08, opacity: 1.0))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 4)
+                        .stroke(Color.black, lineWidth: 1)
+                )
+
+            // Top half
+            VStack(spacing: 0) {
+                HalfTileView(character: character, half: .top)
+                Spacer()
+            }
+
+            // Bottom half
+            VStack(spacing: 0) {
+                Spacer()
+                HalfTileView(character: character, half: .bottom)
             }
         }
         .frame(width: 60, height: 80)
-        .onChange(of: character) { _, newChar in
-            if newChar != displayChar {
-                startAnimation(to: newChar)
-            }
-        }
-        .onAppear {
-            displayChar = character
-            flipChar = character
-        }
-    }
-    
-    private func startAnimation(to targetChar: Character) {
-        // Cancel any existing animation task and bump the animation id so
-        // any in-flight sequences know they are obsolete.
-        animationTask?.cancel()
-        animationId &+= 1
-        let currentId = animationId
-
-        animationTask = Task { @MainActor in
-            await animateSequence(to: targetChar, animationId: currentId)
-        }
-    }
-    
-    @MainActor
-    private func animateSequence(to targetChar: Character, animationId: Int) async {
-        // If a newer animation has started, abort immediately.
-        guard animationId == self.animationId else { return }
-
-        guard let targetIndex = CHARSET.firstIndex(of: targetChar) else {
-            displayChar = targetChar
-            return
-        }
-
-        guard var currentIndex = CHARSET.firstIndex(of: displayChar) else {
-            displayChar = targetChar
-            return
-        }
-
-        var steps = targetIndex - currentIndex
-        if steps < 0 { steps += CHARSET.count }
-        if steps == 0 { return }
-
-        for _ in 0..<steps {
-            // Check again at the start of each step for newer animations.
-            guard animationId == self.animationId else { return }
-
-            if Task.isCancelled { return }
-
-            let nextIndex = (currentIndex + 1) % CHARSET.count
-            let nextChar = CHARSET[nextIndex]
-
-            // Begin flip: show current char on the flipping half
-            flipChar = CHARSET[currentIndex]
-            isFlipping = true
-            flipRotation = 0
-
-            // Play a (throttled) click sound for this flip step.
-            FlipSoundPlayer.shared.playClick()
-
-            // Flip animation duration shortened to 25ms to keep overall
-            // per-step timing around 50ms.
-            withAnimation(.easeInOut(duration: 0.025)) {
-                flipRotation = -180
-            }
-
-            // Wait briefly for the flip to finish (~25ms)
-            try? await Task.sleep(nanoseconds: 25_000_000)
-
-            if Task.isCancelled { return }
-            guard animationId == self.animationId else { return }
-
-            // Commit to the next character and reset the flip
-            displayChar = nextChar
-            isFlipping = false
-            flipRotation = 0
-
-            // Brief pause before the next flip (~25ms) so overall step timing
-            // is about 50ms instead of the previous 100ms.
-            try? await Task.sleep(nanoseconds: 25_000_000)
-
-            currentIndex = nextIndex
-        }
     }
 }
 
@@ -173,11 +164,11 @@ private struct TileView: View {
 private struct HalfTileView: View {
     let character: Character
     let half: Half
-    
+
     enum Half {
         case top, bottom
     }
-    
+
     var body: some View {
         ZStack {
             // Background gradient
@@ -192,7 +183,7 @@ private struct HalfTileView: View {
                 startPoint: .top,
                 endPoint: .bottom
             )
-            
+
             // Text (positioned to show correct half)
             Text(String(character))
                 .font(.system(size: 50, weight: .semibold, design: .monospaced))
@@ -228,5 +219,3 @@ struct BoardView_Previews: PreviewProvider {
         .previewLayout(.sizeThatFits)
     }
 }
-
-

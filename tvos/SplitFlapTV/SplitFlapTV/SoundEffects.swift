@@ -73,9 +73,10 @@ final class FlipSoundPlayer {
         guard let buffer = buffer else { return }
 
         // Throttle to avoid overwhelming the Apple TV with too many clicks.
-        // Limit to at most one click every 20ms (~50 clicks/second).
+        // Limit to at most one click every 50ms (~20 clicks/second).
+        // This significantly reduces overhead when many tiles animate at once.
         let now = CACurrentMediaTime()
-        if now - lastPlayTime < 0.02 {
+        if now - lastPlayTime < 0.05 {
             return
         }
         lastPlayTime = now
