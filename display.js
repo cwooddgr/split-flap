@@ -41,7 +41,9 @@ const DEFAULT_WELCOME_TEXT = '';
 // Connection health check state
 const HEALTH_CHECK_INTERVAL_MS = 300000; // Check every 5 minutes
 const OFFLINE_THRESHOLD_MS = 60000; // Consider offline if no server response for 60s
+const SLEEP_DETECTION_THRESHOLD_MS = 600000; // If health check gap > 10 min, assume computer slept
 let lastServerResponseTime = Date.now();
+let lastHealthCheckTime = Date.now();
 let connectionEstablishedTime = null;
 let isConnected = true;
 let snapshotCount = 0;
@@ -236,11 +238,29 @@ function setupFirestoreListener() {
 function startHealthCheck() {
     debugLog('HEALTH', 'Starting health check interval');
     setInterval(async () => {
-        const timeSinceLastResponse = Date.now() - lastServerResponseTime;
-        debugLog('HEALTH', 'Health check tick - performing active ping', {
+        const now = Date.now();
+        const timeSinceLastResponse = now - lastServerResponseTime;
+        const timeSinceLastHealthCheck = now - lastHealthCheckTime;
+
+        // Detect if computer was asleep (gap much larger than expected interval)
+        const computerWasAsleep = timeSinceLastHealthCheck > SLEEP_DETECTION_THRESHOLD_MS;
+
+        debugLog('HEALTH', 'Health check tick', {
             timeSinceLastResponseMs: timeSinceLastResponse,
+            timeSinceLastHealthCheckMs: timeSinceLastHealthCheck,
+            computerWasAsleep,
             thresholdMs: OFFLINE_THRESHOLD_MS,
         });
+
+        lastHealthCheckTime = now;
+
+        // If computer was asleep, force full reconnect to get fresh auth token
+        if (computerWasAsleep) {
+            debugLog('HEALTH', 'Computer was asleep - forcing full reconnect to refresh auth token');
+            setConnectionState(false);
+            attemptReconnect();
+            return;
+        }
 
         // Active ping: try to read the room document from the server
         try {
