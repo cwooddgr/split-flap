@@ -43,38 +43,89 @@ const HEALTH_CHECK_INTERVAL_MS = 120000; // Check every 2 minutes
 const OFFLINE_THRESHOLD_MS = 60000; // Consider offline if no server response for 60s
 let lastServerResponseTime = Date.now();
 let isConnected = true;
+let snapshotCount = 0;
+let serverResponseCount = 0;
+let cacheResponseCount = 0;
+
+function debugLog(category, message, data = {}) {
+    const timestamp = new Date().toISOString();
+    const uptime = Math.round((Date.now() - pageLoadTime) / 1000);
+    console.log(`[${timestamp}] [${category}] [uptime: ${uptime}s] ${message}`, {
+        ...data,
+        isConnected,
+        lastServerResponseTime: new Date(lastServerResponseTime).toISOString(),
+        timeSinceLastServer: Math.round((Date.now() - lastServerResponseTime) / 1000) + 's',
+        snapshotCount,
+        serverResponseCount,
+        cacheResponseCount,
+    });
+}
+
+const pageLoadTime = Date.now();
+debugLog('INIT', 'Health check system initialized', {
+    HEALTH_CHECK_INTERVAL_MS,
+    OFFLINE_THRESHOLD_MS,
+});
 
 function setConnectionState(connected) {
-    if (isConnected === connected) return;
+    if (isConnected === connected) {
+        debugLog('STATE', `Connection state unchanged: ${connected}`);
+        return;
+    }
+    const previousState = isConnected;
     isConnected = connected;
     document.body.classList.toggle('disconnected', !connected);
     if (!connected) {
         console.warn('Connection lost to Firebase');
+        debugLog('STATE', 'CONNECTION LOST - Background turning red', {
+            previousState,
+            newState: connected,
+        });
     } else {
         console.log('Connection restored to Firebase');
+        debugLog('STATE', 'CONNECTION RESTORED - Background returning to normal', {
+            previousState,
+            newState: connected,
+        });
     }
 }
 
 async function attemptReconnect() {
+    debugLog('RECONNECT', 'Attempting to reconnect via enableNetwork()');
     try {
         await enableNetwork(db);
+        debugLog('RECONNECT', 'enableNetwork() completed successfully');
         // Give it a moment to reconnect, then check if we got a server response
         setTimeout(() => {
             const timeSinceLastResponse = Date.now() - lastServerResponseTime;
+            debugLog('RECONNECT', 'Post-reconnect check', {
+                timeSinceLastResponseMs: timeSinceLastResponse,
+                thresholdMs: OFFLINE_THRESHOLD_MS,
+                stillOffline: timeSinceLastResponse > OFFLINE_THRESHOLD_MS,
+            });
             if (timeSinceLastResponse > OFFLINE_THRESHOLD_MS) {
                 setConnectionState(false);
             }
         }, 5000);
     } catch (err) {
         console.error('Failed to reconnect:', err);
+        debugLog('RECONNECT', 'enableNetwork() failed', { error: err.message });
         setConnectionState(false);
     }
 }
 
 function startHealthCheck() {
+    debugLog('HEALTH', 'Starting health check interval');
     setInterval(() => {
         const timeSinceLastResponse = Date.now() - lastServerResponseTime;
-        if (timeSinceLastResponse > OFFLINE_THRESHOLD_MS) {
+        const isOverThreshold = timeSinceLastResponse > OFFLINE_THRESHOLD_MS;
+        debugLog('HEALTH', 'Health check tick', {
+            timeSinceLastResponseMs: timeSinceLastResponse,
+            thresholdMs: OFFLINE_THRESHOLD_MS,
+            isOverThreshold,
+            willAttemptReconnect: isOverThreshold,
+        });
+        if (isOverThreshold) {
             setConnectionState(false);
             attemptReconnect();
         }
@@ -138,18 +189,41 @@ if (audioPromptEl) {
 
     // Listen to Firestore document for this room
     const roomRef = doc(db, 'rooms', roomId);
+    debugLog('INIT', 'Setting up Firestore listener', { roomId });
 
     onSnapshot(
         roomRef,
         { includeMetadataChanges: true },
         (snapshot) => {
+            snapshotCount++;
+            const fromCache = snapshot.metadata.fromCache;
+            const hasPendingWrites = snapshot.metadata.hasPendingWrites;
+
+            if (fromCache) {
+                cacheResponseCount++;
+            } else {
+                serverResponseCount++;
+            }
+
+            debugLog('SNAPSHOT', 'Received snapshot', {
+                fromCache,
+                hasPendingWrites,
+                exists: snapshot.exists(),
+                hasText: snapshot.exists() && typeof snapshot.data()?.text === 'string',
+                textLength: snapshot.exists() ? snapshot.data()?.text?.length : null,
+            });
+
             // Track connection state via metadata
-            if (!snapshot.metadata.fromCache) {
+            if (!fromCache) {
                 lastServerResponseTime = Date.now();
+                debugLog('SNAPSHOT', 'Server response - updating lastServerResponseTime');
                 setConnectionState(true);
+            } else {
+                debugLog('SNAPSHOT', 'Cache response - NOT updating lastServerResponseTime');
             }
 
             if (!snapshot.exists()) {
+                debugLog('SNAPSHOT', 'Document does not exist, skipping setText');
                 return;
             }
             const data = snapshot.data();
@@ -159,6 +233,11 @@ if (audioPromptEl) {
         },
         (error) => {
             console.error('Error listening to room document', error);
+            debugLog('ERROR', 'Snapshot listener error', {
+                errorMessage: error.message,
+                errorCode: error.code,
+                errorName: error.name,
+            });
             setConnectionState(false);
             attemptReconnect();
         }
