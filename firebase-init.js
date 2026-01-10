@@ -15,6 +15,7 @@ import {
     signInAnonymously,
     signOut,
     onAuthStateChanged,
+    getIdToken,
 } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
 
 // Your web app's Firebase configuration
@@ -65,4 +66,14 @@ async function forceReauthenticate() {
     return signInAnonymously(auth);
 }
 
-export { db, doc, setDoc, getDoc, onSnapshot, serverTimestamp, ensureSignedIn, forceReauthenticate };
+// Proactively refresh the auth token before it expires.
+// Call this periodically (e.g., every 55 minutes) to avoid token expiry gaps.
+async function refreshAuthToken() {
+    if (!auth.currentUser) {
+        return null;
+    }
+    // Force refresh by passing true
+    return getIdToken(auth.currentUser, true);
+}
+
+export { db, doc, setDoc, getDoc, onSnapshot, serverTimestamp, ensureSignedIn, forceReauthenticate, refreshAuthToken };

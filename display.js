@@ -1,4 +1,4 @@
-import { db, doc, getDoc, onSnapshot, ensureSignedIn, forceReauthenticate } from './firebase-init.js';
+import { db, doc, getDoc, onSnapshot, ensureSignedIn, forceReauthenticate, refreshAuthToken } from './firebase-init.js';
 import { SplitFlapDisplay } from './splitflap.js';
 
 // Small-screen handling: show a simple message instead of the display UI
@@ -41,6 +41,7 @@ const DEFAULT_WELCOME_TEXT = '';
 // Connection health check state
 const HEALTH_CHECK_INTERVAL_MS = 300000; // Check every 5 minutes
 const OFFLINE_THRESHOLD_MS = 60000; // Consider offline if no server response for 60s
+const TOKEN_REFRESH_INTERVAL_MS = 55 * 60 * 1000; // Refresh auth token every 55 minutes (before 1hr expiry)
 let lastServerResponseTime = Date.now();
 let connectionEstablishedTime = null;
 let isConnected = true;
@@ -332,6 +333,23 @@ function startHealthCheck() {
     }, HEALTH_CHECK_INTERVAL_MS);
 }
 
+function startTokenRefresh() {
+    debugLog('TOKEN', 'Starting proactive token refresh interval (every 55 min)');
+    setInterval(async () => {
+        debugLog('TOKEN', 'Proactively refreshing auth token before expiry');
+        try {
+            await refreshAuthToken();
+            debugLog('TOKEN', 'Auth token refreshed successfully');
+        } catch (err) {
+            console.error('Token refresh failed:', err);
+            debugLog('TOKEN', 'Token refresh failed - will rely on 403 handler', {
+                errorMessage: err.message,
+                errorCode: err.code,
+            });
+        }
+    }, TOKEN_REFRESH_INTERVAL_MS);
+}
+
 // Subtle overlay to prompt the user to enable sound with a single tap
 const audioPromptEl = document.getElementById('audioPrompt');
 if (audioPromptEl) {
@@ -387,9 +405,10 @@ if (audioPromptEl) {
         }
     }
 
-    // Set up Firestore listener and start health check
+    // Set up Firestore listener, health check, and proactive token refresh
     setupFirestoreListener();
     startHealthCheck();
+    startTokenRefresh();
 
     // Show a default welcome message until a remote sends text
     display.setText(DEFAULT_WELCOME_TEXT);
