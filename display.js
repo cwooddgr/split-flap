@@ -131,7 +131,6 @@ function setConnectionState(connected) {
     }
     const previousState = isConnected;
     isConnected = connected;
-    document.body.classList.toggle('disconnected', !connected);
     if (!connected) {
         const now = Date.now();
         const timeSinceEstablished = connectionEstablishedTime ? now - connectionEstablishedTime : null;
@@ -397,12 +396,12 @@ if (audioPromptEl) {
             correctLevel: window.QRCode.CorrectLevel.M,
         });
 
-        // Allow user to hide the QR overlay with a single tap/click
-        if (qrContainer) {
-            qrContainer.addEventListener('click', () => {
-                qrContainer.style.display = 'none';
-            });
-        }
+        // Allow user to toggle the QR overlay with a tap/click anywhere on the page
+        document.addEventListener('click', () => {
+            if (qrContainer) {
+                qrContainer.style.display = qrContainer.style.display === 'none' ? 'block' : 'none';
+            }
+        });
     }
 
     // Set up Firestore listener, health check, and proactive token refresh

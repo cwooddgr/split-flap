@@ -17,11 +17,6 @@ body {
     transition: background 0.5s ease;
 }
 
-/* Disconnected state - red background */
-body.disconnected {
-    background: linear-gradient(135deg, #8b0000 0%, #4a0000 100%);
-}
-
 .container {
     text-align: center;
     width: 100%;

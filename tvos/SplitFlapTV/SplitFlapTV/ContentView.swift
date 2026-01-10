@@ -44,16 +44,12 @@ struct ContentView: View {
         return components?.url?.absoluteString
     }
 
-    /// Background color changes to red when disconnected from Firebase.
-    private var backgroundColor: Color {
-        viewModel.isConnected ? .black : Color(red: 0.5, green: 0, blue: 0)
-    }
+    private let backgroundColor: Color = .black
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             backgroundColor
                 .ignoresSafeArea()
-                .animation(.easeInOut(duration: 0.5), value: viewModel.isConnected)
 
             // Display board centered, filling most of the screen with a border.
             BoardView(
@@ -74,11 +70,11 @@ struct ContentView: View {
             }
         }
         // On tvOS, treat any remote tap (select press on the focused area)
-        // as a request to hide the QR code, mirroring the web app's tap-to-hide.
+        // as a toggle for the QR code visibility.
         .focusable(true)
         .contentShape(Rectangle())
         .onTapGesture {
-            isQRCodeHidden = true
+            isQRCodeHidden.toggle()
         }
         // Keep the Apple TV from sleeping/screensaver while this view is visible.
         .onAppear {
