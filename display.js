@@ -41,11 +41,10 @@ const DEFAULT_WELCOME_TEXT = '';
 // Connection health check state
 const HEALTH_CHECK_INTERVAL_MS = 300000; // Check every 5 minutes
 const OFFLINE_THRESHOLD_MS = 60000; // Consider offline if no server response for 60s
-const SLEEP_DETECTION_THRESHOLD_MS = 600000; // If health check gap > 10 min, assume computer slept
 let lastServerResponseTime = Date.now();
-let lastHealthCheckTime = Date.now();
 let connectionEstablishedTime = null;
 let isConnected = true;
+let isReconnecting = false;
 let snapshotCount = 0;
 let serverResponseCount = 0;
 let cacheResponseCount = 0;
@@ -72,6 +71,45 @@ debugLog('INIT', 'Health check system initialized', {
     HEALTH_CHECK_INTERVAL_MS,
     OFFLINE_THRESHOLD_MS,
 });
+
+// Global handler to catch Firebase 403 errors and trigger reconnect
+window.addEventListener('error', (event) => {
+    // Check if this is a resource loading error (like failed fetch)
+    if (event.target && event.target.tagName === 'SCRIPT') {
+        return; // Ignore script loading errors
+    }
+});
+
+// Intercept fetch to detect 403 errors from Firebase
+const originalFetch = window.fetch;
+window.fetch = async function(...args) {
+    try {
+        const response = await originalFetch.apply(this, args);
+        const url = args[0]?.toString() || '';
+
+        // Check for 403 on Firebase URLs
+        if (response.status === 403 &&
+            (url.includes('firestore.googleapis.com') ||
+             url.includes('securetoken.googleapis.com') ||
+             url.includes('identitytoolkit.googleapis.com'))) {
+            debugLog('AUTH', '403 error detected on Firebase request', {
+                url: url.substring(0, 100),
+                status: response.status,
+                isReconnecting,
+            });
+
+            // Trigger reconnect if not already reconnecting
+            if (!isReconnecting) {
+                debugLog('AUTH', '403 detected - triggering reconnect');
+                setConnectionState(false);
+                attemptReconnect();
+            }
+        }
+        return response;
+    } catch (err) {
+        throw err;
+    }
+};
 
 function formatDuration(ms) {
     const seconds = Math.floor(ms / 1000);
@@ -131,6 +169,11 @@ Last server response at:           ${new Date(lastServerResponseTime).toISOStrin
 }
 
 async function attemptReconnect() {
+    if (isReconnecting) {
+        debugLog('RECONNECT', 'Already reconnecting, skipping');
+        return;
+    }
+    isReconnecting = true;
     reconnectCount++;
     debugLog('RECONNECT', 'Attempting full reconnect - teardown and rebuild listener');
 
@@ -155,6 +198,8 @@ async function attemptReconnect() {
         debugLog('RECONNECT', 'Setting up new Firestore listener');
         setupFirestoreListener();
 
+        isReconnecting = false;
+
         // Check after a delay if reconnection worked
         setTimeout(() => {
             const timeSinceLastResponse = Date.now() - lastServerResponseTime;
@@ -168,6 +213,7 @@ async function attemptReconnect() {
             }
         }, 10000);
     } catch (err) {
+        isReconnecting = false;
         console.error('Failed to reconnect:', err);
         debugLog('RECONNECT', 'Reconnect failed', { error: err.message });
         setConnectionState(false);
@@ -238,29 +284,12 @@ function setupFirestoreListener() {
 function startHealthCheck() {
     debugLog('HEALTH', 'Starting health check interval');
     setInterval(async () => {
-        const now = Date.now();
-        const timeSinceLastResponse = now - lastServerResponseTime;
-        const timeSinceLastHealthCheck = now - lastHealthCheckTime;
+        const timeSinceLastResponse = Date.now() - lastServerResponseTime;
 
-        // Detect if computer was asleep (gap much larger than expected interval)
-        const computerWasAsleep = timeSinceLastHealthCheck > SLEEP_DETECTION_THRESHOLD_MS;
-
-        debugLog('HEALTH', 'Health check tick', {
+        debugLog('HEALTH', 'Health check tick - performing active ping', {
             timeSinceLastResponseMs: timeSinceLastResponse,
-            timeSinceLastHealthCheckMs: timeSinceLastHealthCheck,
-            computerWasAsleep,
             thresholdMs: OFFLINE_THRESHOLD_MS,
         });
-
-        lastHealthCheckTime = now;
-
-        // If computer was asleep, force full reconnect to get fresh auth token
-        if (computerWasAsleep) {
-            debugLog('HEALTH', 'Computer was asleep - forcing full reconnect to refresh auth token');
-            setConnectionState(false);
-            attemptReconnect();
-            return;
-        }
 
         // Active ping: try to read the room document from the server
         try {
