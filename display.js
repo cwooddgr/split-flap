@@ -1,4 +1,4 @@
-import { db, doc, onSnapshot, ensureSignedIn } from './firebase-init.js';
+import { db, doc, onSnapshot, ensureSignedIn, enableNetwork } from './firebase-init.js';
 import { SplitFlapDisplay } from './splitflap.js';
 
 // Small-screen handling: show a simple message instead of the display UI
@@ -37,6 +37,49 @@ const display = new SplitFlapDisplay('displayBoard', 21, 6);
 // Default message placeholder for the display on load.
 // Currently empty so the board starts blank, but kept for easy future tweaks.
 const DEFAULT_WELCOME_TEXT = '';
+
+// Connection health check state
+const HEALTH_CHECK_INTERVAL_MS = 120000; // Check every 2 minutes
+const OFFLINE_THRESHOLD_MS = 60000; // Consider offline if no server response for 60s
+let lastServerResponseTime = Date.now();
+let isConnected = true;
+
+function setConnectionState(connected) {
+    if (isConnected === connected) return;
+    isConnected = connected;
+    document.body.classList.toggle('disconnected', !connected);
+    if (!connected) {
+        console.warn('Connection lost to Firebase');
+    } else {
+        console.log('Connection restored to Firebase');
+    }
+}
+
+async function attemptReconnect() {
+    try {
+        await enableNetwork(db);
+        // Give it a moment to reconnect, then check if we got a server response
+        setTimeout(() => {
+            const timeSinceLastResponse = Date.now() - lastServerResponseTime;
+            if (timeSinceLastResponse > OFFLINE_THRESHOLD_MS) {
+                setConnectionState(false);
+            }
+        }, 5000);
+    } catch (err) {
+        console.error('Failed to reconnect:', err);
+        setConnectionState(false);
+    }
+}
+
+function startHealthCheck() {
+    setInterval(() => {
+        const timeSinceLastResponse = Date.now() - lastServerResponseTime;
+        if (timeSinceLastResponse > OFFLINE_THRESHOLD_MS) {
+            setConnectionState(false);
+            attemptReconnect();
+        }
+    }, HEALTH_CHECK_INTERVAL_MS);
+}
 
 // Subtle overlay to prompt the user to enable sound with a single tap
 const audioPromptEl = document.getElementById('audioPrompt');
@@ -98,7 +141,14 @@ if (audioPromptEl) {
 
     onSnapshot(
         roomRef,
+        { includeMetadataChanges: true },
         (snapshot) => {
+            // Track connection state via metadata
+            if (!snapshot.metadata.fromCache) {
+                lastServerResponseTime = Date.now();
+                setConnectionState(true);
+            }
+
             if (!snapshot.exists()) {
                 return;
             }
@@ -109,8 +159,13 @@ if (audioPromptEl) {
         },
         (error) => {
             console.error('Error listening to room document', error);
+            setConnectionState(false);
+            attemptReconnect();
         }
     );
+
+    // Start periodic health check
+    startHealthCheck();
 
     // Show a default welcome message until a remote sends text
     display.setText(DEFAULT_WELCOME_TEXT);
