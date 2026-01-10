@@ -44,9 +44,16 @@ struct ContentView: View {
         return components?.url?.absoluteString
     }
 
+    /// Background color changes to red when disconnected from Firebase.
+    private var backgroundColor: Color {
+        viewModel.isConnected ? .black : Color(red: 0.5, green: 0, blue: 0)
+    }
+
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
-            Color.black.ignoresSafeArea()
+            backgroundColor
+                .ignoresSafeArea()
+                .animation(.easeInOut(duration: 0.5), value: viewModel.isConnected)
 
             // Display board centered, filling most of the screen with a border.
             BoardView(
