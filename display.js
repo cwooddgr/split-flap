@@ -39,7 +39,7 @@ const display = new SplitFlapDisplay('displayBoard', 21, 6);
 const DEFAULT_WELCOME_TEXT = '';
 
 // Connection health check state
-const HEALTH_CHECK_INTERVAL_MS = 120000; // Check every 2 minutes
+const HEALTH_CHECK_INTERVAL_MS = 300000; // Check every 5 minutes
 const OFFLINE_THRESHOLD_MS = 60000; // Consider offline if no server response for 60s
 let lastServerResponseTime = Date.now();
 let connectionEstablishedTime = null;
