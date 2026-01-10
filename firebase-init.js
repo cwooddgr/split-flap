@@ -8,8 +8,6 @@ import {
     setDoc,
     onSnapshot,
     serverTimestamp,
-    enableNetwork,
-    disableNetwork,
 } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
 import {
     getAuth,
@@ -54,4 +52,4 @@ function ensureSignedIn() {
     });
 }
 
-export { db, doc, setDoc, onSnapshot, serverTimestamp, ensureSignedIn, enableNetwork, disableNetwork };
+export { db, doc, setDoc, onSnapshot, serverTimestamp, ensureSignedIn };

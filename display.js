@@ -1,4 +1,4 @@
-import { db, doc, onSnapshot, ensureSignedIn, enableNetwork } from './firebase-init.js';
+import { db, doc, onSnapshot, ensureSignedIn } from './firebase-init.js';
 import { SplitFlapDisplay } from './splitflap.js';
 
 // Small-screen handling: show a simple message instead of the display UI
@@ -46,6 +46,8 @@ let isConnected = true;
 let snapshotCount = 0;
 let serverResponseCount = 0;
 let cacheResponseCount = 0;
+let unsubscribeListener = null;
+let reconnectCount = 0;
 
 function debugLog(category, message, data = {}) {
     const timestamp = new Date().toISOString();
@@ -58,6 +60,7 @@ function debugLog(category, message, data = {}) {
         snapshotCount,
         serverResponseCount,
         cacheResponseCount,
+        reconnectCount,
     });
 }
 
@@ -91,11 +94,31 @@ function setConnectionState(connected) {
 }
 
 async function attemptReconnect() {
-    debugLog('RECONNECT', 'Attempting to reconnect via enableNetwork()');
+    reconnectCount++;
+    debugLog('RECONNECT', 'Attempting full reconnect - teardown and rebuild listener');
+
+    // Unsubscribe existing listener
+    if (unsubscribeListener) {
+        debugLog('RECONNECT', 'Unsubscribing existing listener');
+        try {
+            unsubscribeListener();
+        } catch (err) {
+            debugLog('RECONNECT', 'Error unsubscribing', { error: err.message });
+        }
+        unsubscribeListener = null;
+    }
+
     try {
-        await enableNetwork(db);
-        debugLog('RECONNECT', 'enableNetwork() completed successfully');
-        // Give it a moment to reconnect, then check if we got a server response
+        // Re-authenticate (get fresh anonymous auth if needed)
+        debugLog('RECONNECT', 'Re-authenticating...');
+        await ensureSignedIn();
+        debugLog('RECONNECT', 'Re-authentication successful');
+
+        // Set up fresh listener
+        debugLog('RECONNECT', 'Setting up new Firestore listener');
+        setupFirestoreListener();
+
+        // Check after a delay if reconnection worked
         setTimeout(() => {
             const timeSinceLastResponse = Date.now() - lastServerResponseTime;
             debugLog('RECONNECT', 'Post-reconnect check', {
@@ -106,12 +129,69 @@ async function attemptReconnect() {
             if (timeSinceLastResponse > OFFLINE_THRESHOLD_MS) {
                 setConnectionState(false);
             }
-        }, 5000);
+        }, 10000);
     } catch (err) {
         console.error('Failed to reconnect:', err);
-        debugLog('RECONNECT', 'enableNetwork() failed', { error: err.message });
+        debugLog('RECONNECT', 'Reconnect failed', { error: err.message });
         setConnectionState(false);
     }
+}
+
+function setupFirestoreListener() {
+    const roomRef = doc(db, 'rooms', roomId);
+    debugLog('LISTENER', 'Setting up Firestore listener', { roomId });
+
+    unsubscribeListener = onSnapshot(
+        roomRef,
+        { includeMetadataChanges: true },
+        (snapshot) => {
+            snapshotCount++;
+            const fromCache = snapshot.metadata.fromCache;
+            const hasPendingWrites = snapshot.metadata.hasPendingWrites;
+
+            if (fromCache) {
+                cacheResponseCount++;
+            } else {
+                serverResponseCount++;
+            }
+
+            debugLog('SNAPSHOT', 'Received snapshot', {
+                fromCache,
+                hasPendingWrites,
+                exists: snapshot.exists(),
+                hasText: snapshot.exists() && typeof snapshot.data()?.text === 'string',
+                textLength: snapshot.exists() ? snapshot.data()?.text?.length : null,
+            });
+
+            // Track connection state via metadata
+            if (!fromCache) {
+                lastServerResponseTime = Date.now();
+                debugLog('SNAPSHOT', 'Server response - updating lastServerResponseTime');
+                setConnectionState(true);
+            } else {
+                debugLog('SNAPSHOT', 'Cache response - NOT updating lastServerResponseTime');
+            }
+
+            if (!snapshot.exists()) {
+                debugLog('SNAPSHOT', 'Document does not exist, skipping setText');
+                return;
+            }
+            const data = snapshot.data();
+            if (typeof data.text === 'string') {
+                display.setText(data.text);
+            }
+        },
+        (error) => {
+            console.error('Error listening to room document', error);
+            debugLog('ERROR', 'Snapshot listener error', {
+                errorMessage: error.message,
+                errorCode: error.code,
+                errorName: error.name,
+            });
+            setConnectionState(false);
+            attemptReconnect();
+        }
+    );
 }
 
 function startHealthCheck() {
@@ -187,63 +267,8 @@ if (audioPromptEl) {
         }
     }
 
-    // Listen to Firestore document for this room
-    const roomRef = doc(db, 'rooms', roomId);
-    debugLog('INIT', 'Setting up Firestore listener', { roomId });
-
-    onSnapshot(
-        roomRef,
-        { includeMetadataChanges: true },
-        (snapshot) => {
-            snapshotCount++;
-            const fromCache = snapshot.metadata.fromCache;
-            const hasPendingWrites = snapshot.metadata.hasPendingWrites;
-
-            if (fromCache) {
-                cacheResponseCount++;
-            } else {
-                serverResponseCount++;
-            }
-
-            debugLog('SNAPSHOT', 'Received snapshot', {
-                fromCache,
-                hasPendingWrites,
-                exists: snapshot.exists(),
-                hasText: snapshot.exists() && typeof snapshot.data()?.text === 'string',
-                textLength: snapshot.exists() ? snapshot.data()?.text?.length : null,
-            });
-
-            // Track connection state via metadata
-            if (!fromCache) {
-                lastServerResponseTime = Date.now();
-                debugLog('SNAPSHOT', 'Server response - updating lastServerResponseTime');
-                setConnectionState(true);
-            } else {
-                debugLog('SNAPSHOT', 'Cache response - NOT updating lastServerResponseTime');
-            }
-
-            if (!snapshot.exists()) {
-                debugLog('SNAPSHOT', 'Document does not exist, skipping setText');
-                return;
-            }
-            const data = snapshot.data();
-            if (typeof data.text === 'string') {
-                display.setText(data.text);
-            }
-        },
-        (error) => {
-            console.error('Error listening to room document', error);
-            debugLog('ERROR', 'Snapshot listener error', {
-                errorMessage: error.message,
-                errorCode: error.code,
-                errorName: error.name,
-            });
-            setConnectionState(false);
-            attemptReconnect();
-        }
-    );
-
-    // Start periodic health check
+    // Set up Firestore listener and start health check
+    setupFirestoreListener();
     startHealthCheck();
 
     // Show a default welcome message until a remote sends text
