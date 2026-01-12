@@ -17,10 +17,10 @@ struct ContentView: View {
         return id
     }()
 
-    // Board configuration matches the web display (21x6).
+    // Board configuration for tvOS (21x8).
     // We no longer show a default message; the board starts blank until
     // Firestore delivers real data for the current room.
-    private let sampleConfig = BoardConfig(cols: 21, rows: 6)
+    private let sampleConfig = BoardConfig(cols: 21, rows: 8)
 
     // Room id is generated randomly once per app launch, like the web display.
     @StateObject private var viewModel = RoomViewModel(roomId: ContentView.initialRoomId)
@@ -51,14 +51,12 @@ struct ContentView: View {
             backgroundColor
                 .ignoresSafeArea()
 
-            // Display board centered, filling most of the screen with a border.
+            // Display board centered on screen.
             BoardView(
                 config: sampleConfig,
                 message: effectiveText
             )
             .scaleEffect(1.3)
-            .padding(.top, 40)
-            .offset(y: -100)         // negative offset moves the board up
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
 
             // QR code anchored in the bottom-right corner.
@@ -66,7 +64,7 @@ struct ContentView: View {
             // attached the Firestore listener (viewModel.isReady == true).
             if let controlURLString, !isQRCodeHidden, viewModel.isReady {
                 QRCodeView(text: controlURLString, size: 160)
-                    .padding(40)
+                    .padding(60)
             }
         }
         // On tvOS, treat any remote tap (select press on the focused area)
