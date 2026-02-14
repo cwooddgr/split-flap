@@ -8,11 +8,11 @@ Split-Flap is a minimalist split-flap style message board with two implementatio
 - **Web app**: Static HTML/CSS/JS for display (`index.html`) and remote control (`control.html`)
 - **tvOS app**: Native SwiftUI app for Apple TV (`tvos/SplitFlapTV/`)
 
-Both platforms connect to the same Firebase backend (Firestore) and share a unified protocol. The display shows a 21×6 grid of animated split-flap tiles; a separate remote sends text to display via Firebase.
+Both connect to the same Firebase backend (Firestore). A display generates a random `roomId`, shows a QR code linking to the remote, and listens for real-time updates. The remote writes text to `rooms/{roomId}` in Firestore, and the display animates split-flap tiles to show it.
 
 ## Running Locally
 
-### Web App (no build required)
+### Web App (no build step, no dependencies)
 
 ```bash
 python -m http.server 8000
@@ -20,11 +20,17 @@ python -m http.server 8000
 # Scan QR code with phone to get control.html link
 ```
 
+The web app is pure static files using ES modules (`import`/`export`). Firebase SDK is loaded via CDN in `firebase-init.js`. Hosted at `flipflap.dgrlabs.co` (see `CNAME`).
+
 ### tvOS App
 
-1. Open `tvos/SplitFlapTV/SplitFlapTV.xcodeproj` in Xcode
-2. Ensure `GoogleService-Info.plist` is in the project (from Firebase console)
-3. Build and run (Cmd+R) on tvOS simulator or Apple TV device
+```bash
+open tvos/SplitFlapTV/SplitFlapTV.xcodeproj
+# Requires GoogleService-Info.plist from Firebase console
+# Build and run (Cmd+R) on tvOS simulator or Apple TV device
+```
+
+Firebase SDK is managed via Swift Package Manager (configured in the Xcode project). No CocoaPods or Carthage.
 
 ## Architecture
 
@@ -38,38 +44,61 @@ python -m http.server 8000
     ┌─────────┴────────┐   ┌──────┴───────┐
     │   Web Display    │   │  Web Remote  │
     │  (index.html)    │   │(control.html)│
-    │  - Renders board │   │- Writes text │
+    │  21×6 grid       │   │- Writes text │
     │  - Shows QR code │   │- Preset msgs │
     └──────────────────┘   └──────────────┘
               ↑
     ┌─────────┴────────┐
     │   tvOS Display   │
     │ (SplitFlapTV)    │
-    │  - SwiftUI board │
+    │  21×8 grid       │
     │  - Same protocol │
     └──────────────────┘
 ```
 
-**Flow**: Display generates random `roomId` → shows QR code linking to remote → remote writes to `rooms/{roomId}` → display receives real-time update → animates split-flap tiles.
-
 ## Key Files
 
 ### Web App
-- `splitflap.js` - Core split-flap rendering engine (animation, layout, sound)
-- `display.js` - Display page logic (room creation, Firebase listener)
-- `control.js` - Remote page logic (text input, preset quotes)
-- `firebase-init.js` - Firebase configuration and initialization
+- `splitflap.js` - Core `SplitFlapDisplay` class: rendering engine, animation loop, layout, sound
+- `display.js` - Display page: room creation, Firebase `onSnapshot` listener, QR code
+- `control.js` - Remote page: text input, preset quotes, Firebase writes
+- `firebase-init.js` - Firebase config, initialization, auth helpers (shared by display + control)
 
 ### tvOS App (`tvos/SplitFlapTV/SplitFlapTV/`)
-- `ViewModels/RoomViewModel.swift` - Firebase subscription, room state management
-- `Views/BoardView.swift` - 21×6 grid rendering
-- `Views/BoardLayout.swift` - Word-wrap and centering logic (port of JS)
-- `Views/TileView.swift` - Split-flap tile animation
+- `ContentView.swift` - Root view: room ID generation, QR code toggle, board container
+- `ViewModels/RoomViewModel.swift` - Firebase subscription, anonymous auth, room state
+- `Views/BoardView.swift` - Grid rendering + animation coordinator + `TileView` (all in one file)
+- `Views/BoardLayout.swift` - Word-wrap and centering logic (Swift port of `splitflap.js`)
+- `Views/QRCodeView.swift` - QR code rendering via CoreImage
+- `Models/RoomState.swift` - `BoardConfig` and `RoomState` structs
 - `SoundEffects.swift` - Click sound via AVAudioEngine
 
 ### Protocol
 - `docs/PROTOCOL.md` - Canonical Firestore document shape and contracts
 - `shared/protocol.ts` - TypeScript interfaces (documentation only, not runtime)
+
+## Board Dimensions
+
+The two platforms use different grid sizes:
+- **Web**: 21 columns × 6 rows (in `display.js`: `new SplitFlapDisplay('displayBoard', 21, 6)`)
+- **tvOS**: 21 columns × 8 rows (in `ContentView.swift`: `BoardConfig(cols: 21, rows: 8)`)
+
+Both use the same layout algorithm (word-wrap, center) and 74-character `CHARSET` constant.
+
+## Layout Algorithm
+
+Both web and tvOS implement the same layout:
+1. Split text on `\n` into logical lines
+2. Word-wrap each line at spaces to fit 21 columns
+3. Horizontally center based on widest line
+4. Vertically center within available rows
+5. All text is uppercased
+
+Character set: Space, A-Z, 0-9, common punctuation, smart quotes, degree symbol, dashes (74 chars total, defined in `CHARSET` in both `splitflap.js` and `BoardView.swift`).
+
+## tvOS Animation Architecture
+
+The tvOS app uses a centralized animation coordinator (single `Task` with a timer loop) instead of per-tile async tasks. One animation tick advances all tiles one step through `CHARSET` toward their targets, with a single batched `currentBoard` state update per tick (~50ms interval). This is critical for performance on Apple TV hardware.
 
 ## Firestore Document Shape
 
@@ -83,43 +112,28 @@ python -m http.server 8000
 }
 ```
 
-## Layout Algorithm
-
-Both web and tvOS implement the same layout:
-1. Split text on `\n` into logical lines
-2. Word-wrap each line at spaces to fit 21 columns
-3. Horizontally center based on widest line
-4. Vertically center within 6 rows
-5. All text is uppercased
-
-Character set: Space, A-Z, 0-9, common punctuation, smart quotes, degree symbol, dashes (74 chars total, defined in `CHARSET` constant).
-
 ## Firebase Requirements
 
 - **Cloud Firestore** enabled (Native mode)
 - **Anonymous authentication** enabled
 - **Authorized domains** configured (Firebase Console → Authentication → Settings → Authorized domains)
 - **API key** configured with correct referrer restrictions (Google Cloud Console → APIs & Services → Credentials)
-- Web config in `firebase-init.js`
-- tvOS config via `GoogleService-Info.plist`
+- Web config in `firebase-init.js`, tvOS config via `GoogleService-Info.plist`
 
 ### Firestore Security Rules
 
-The `rooms` collection must be explicitly allowed in your security rules. Without this, real-time listeners will fail silently:
+The `rooms` collection must be explicitly allowed. Without this, real-time `onSnapshot` listeners will fail silently:
 
 ```javascript
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Split-flap rooms - authenticated users can read/write
     match /rooms/{roomId} {
       allow read: if request.auth != null;
       allow write: if request.auth != null
         && request.resource.data.text is string
         && request.resource.data.text.size() <= 10000;
     }
-
-    // Deny all other access by default
     match /{document=**} {
       allow read, write: if false;
     }
@@ -130,4 +144,3 @@ service cloud.firestore {
 Key points:
 - `request.auth != null` allows anonymous auth (used by both web and tvOS)
 - Use `allow read` (not `allow get`) to support `onSnapshot()` real-time listeners
-- The catch-all deny rule blocks access to any other collections

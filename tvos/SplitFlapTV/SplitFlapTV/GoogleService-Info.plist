@@ -3,13 +3,13 @@
 <plist version="1.0">
 <dict>
 	<key>API_KEY</key>
-	<string>AIzaSyAE3kx_W7pqYx51q1cJj6P18w_mNQmUyks</string>
+	<string>AIzaSyDwU-pTxKTJS8Zx3DdmzMvuK0VKgQf8d2U</string>
 	<key>GCM_SENDER_ID</key>
 	<string>213114555372</string>
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.cwood.SplitFlapTV</string>
+	<string>co.dgrlabs.flipflap</string>
 	<key>PROJECT_ID</key>
 	<string>split-flap-ff40a</string>
 	<key>STORAGE_BUCKET</key>
@@ -25,6 +25,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:213114555372:ios:45026d00fb30d3ef658ec9</string>
+	<string>1:213114555372:ios:96db1b5c740b1383658ec9</string>
 </dict>
 </plist>
