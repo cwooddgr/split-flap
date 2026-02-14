@@ -48,6 +48,68 @@ if (!roomId || !isValidRoom(roomId)) {
     const funnyBtn = document.getElementById('funnyBtn');
     const clearBtn = document.getElementById('clearBtn');
 
+    // --- Holiday detection helpers ---
+
+    function getEasterDate(year) {
+        const a = year % 19;
+        const b = Math.floor(year / 100);
+        const c = year % 100;
+        const d = Math.floor(b / 4);
+        const e = b % 4;
+        const f = Math.floor((b + 8) / 25);
+        const g = Math.floor((b - f + 1) / 3);
+        const h = (19 * a + b - d - g + 15) % 30;
+        const i = Math.floor(c / 4);
+        const k = c % 4;
+        const l = (32 + 2 * e + 2 * i - h - k) % 7;
+        const m = Math.floor((a + 11 * h + 22 * l) / 451);
+        const month = Math.floor((h + l - 7 * m + 114) / 31);
+        const day = ((h + l - 7 * m + 114) % 31) + 1;
+        return new Date(year, month - 1, day);
+    }
+
+    function getNthWeekdayOfMonth(year, month, weekday, n) {
+        const first = new Date(year, month, 1);
+        let day = 1 + ((weekday - first.getDay() + 7) % 7);
+        day += (n - 1) * 7;
+        return new Date(year, month, day);
+    }
+
+    function getNextHoliday() {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const holidays = [];
+        for (const year of [today.getFullYear(), today.getFullYear() + 1]) {
+            holidays.push(
+                { key: 'newyears', name: "New Year's", date: new Date(year, 0, 1) },
+                { key: 'valentines', name: "Valentine's Day", date: new Date(year, 1, 14) },
+                { key: 'stpatricks', name: "St. Patrick's Day", date: new Date(year, 2, 17) },
+                { key: 'easter', name: 'Easter', date: getEasterDate(year) },
+                { key: 'aprilfools', name: "April Fool's Day", date: new Date(year, 3, 1) },
+                { key: 'mothers', name: "Mother's Day", date: getNthWeekdayOfMonth(year, 4, 0, 2) },
+                { key: 'fathers', name: "Father's Day", date: getNthWeekdayOfMonth(year, 5, 0, 3) },
+                { key: 'independence', name: 'Independence Day', date: new Date(year, 6, 4) },
+                { key: 'labor', name: 'Labor Day', date: getNthWeekdayOfMonth(year, 8, 1, 1) },
+                { key: 'halloween', name: 'Halloween', date: new Date(year, 9, 31) },
+                { key: 'thanksgiving', name: 'Thanksgiving', date: getNthWeekdayOfMonth(year, 10, 4, 4) },
+                { key: 'christmas', name: 'Christmas', date: new Date(year, 11, 25) },
+            );
+        }
+
+        let closest = null;
+        for (const h of holidays) {
+            h.date.setHours(0, 0, 0, 0);
+            const diff = Math.round((h.date - today) / (1000 * 60 * 60 * 24));
+            if (diff >= 0 && diff <= 30) {
+                if (!closest || diff < closest.daysUntil) {
+                    closest = { key: h.key, name: h.name, daysUntil: diff };
+                }
+            }
+        }
+        return closest;
+    }
+
     const randomTexts = [
         'IF YOU WANT\nTO FIND HAPPINESS\nFIND GRATITUDE.',
         'EVERY MOMENT\nIS A FRESH\nBEGINNING.',
@@ -174,7 +236,7 @@ if (!roomId || !isValidRoom(roomId)) {
         'MY ALONE TIME IS\nFOR YOUR SAFETY.',
         "I'M MULTITASKING:\nI CAN LISTEN,\nIGNORE, AND FORGET\nALL AT ONCE.",
         'OF COURSE I TALK\nTO MYSELF.\nSOMETIMES I NEED\nEXPERT ADVICE.',
-        "I'M NOT CLUMSY.\nTHE FLOOR JUST\nHATES ME,\nTABLES AND CHAIRS\nARE BULLIES,\nAND WALLS GET IN\nMY WAY.",
+        "I'M NOT CLUMSY.\nTHE FLOOR HATES ME,\nTABLES ARE BULLIES,\nAND WALLS GET\nIN MY WAY.",
         'MY COOKING IS SO\nBAD MY SMOKE\nDETECTOR CHEERS\nME ON.',
         'I HAVE A LOT OF\nJOKES ABOUT\nUNEMPLOYED PEOPLE,\nBUT NONE OF THEM\nWORK.',
         'THEY SAY NOTHING\nIS IMPOSSIBLE,\nBUT I DO NOTHING\nEVERY DAY.',
@@ -196,7 +258,7 @@ if (!roomId || !isValidRoom(roomId)) {
         'I USED TO THINK\nI WAS INDECISIVE,\nBUT NOW I AM NOT\nSO SURE.',
         "I'LL BE READY\nIN FIVE MINUTES.\nDO NOT CALL ME\nFOR 30 MINUTES.",
         'MY WINDOWS ARE\nNOT DIRTY.\nTHAT IS MY DOG\nNOSE ART.',
-        'I FINALLY\nREALIZED THAT\nPEOPLE ARE\nPRISONERS OF\nTHEIR PHONES.\nTHAT IS WHY THEY\nARE CALLED CELLS.',
+        'I FINALLY REALIZED\nPEOPLE ARE\nPRISONERS OF\nTHEIR PHONES.\nTHAT IS WHY THEY\nARE CALLED CELLS.',
         'SOMETIMES I FEEL\nUGLY, BUT THEN I\nLOOK AT MY BROTHER\nAND I FEEL OKAY.',
         "I'M ON THAT NEW\nDIET WHERE YOU\nEAT EVERYTHING\nAND PRAY FOR A\nMIRACLE.",
         'THE BAGS UNDER MY\nEYES ARE DESIGNER.',
@@ -217,6 +279,393 @@ if (!roomId || !isValidRoom(roomId)) {
         'PEOPLE SAY\nNOTHING IS\nIMPOSSIBLE, BUT I\nDO NOTHING EVERY\nDAY.',
         'LIFE UPDATE:\nCURRENTLY HOLDING\nIT ALL TOGETHER\nWITH ONE BOBBY PIN.',
     ];
+
+    const holidayQuotes = {
+        newyears: [
+            'NEW YEAR, SAME ME.\nJUST SLIGHTLY MORE\nCONFUSED.',
+            '365 NEW DAYS TO\nPRETEND I WILL\nGO TO THE GYM.',
+            'MY RESOLUTION IS\n1920 BY 1080.',
+            'I ALREADY BROKE MY\nRESOLUTION.\nIT WAS A GOOD\nTEN MINUTES.',
+            'MAY YOUR YEAR BE\nAS AWESOME AS YOU\nPRETEND ONLINE.',
+            'JAN 1: NEW ME.\nJAN 2: OLD ME\nWITH A HANGOVER.',
+            'THIS YEAR I WILL\nBE MORE DECISIVE.\nOR MAYBE NOT.',
+            'HAPPY NEW YEAR!\nMAY YOUR WIFI\nALWAYS BE STRONG.',
+            'NEW YEAR TIP:\nDO NOT SET THE BAR\nTOO HIGH.\nJUST SHOW UP.',
+            'ANOTHER YEAR OF\nPRETENDING I READ\nMORE BOOKS.',
+            'MY YEAR IN REVIEW:\nSURVIVED.\nTHE END.',
+            'PLOT TWIST:\nTHIS IS YOUR YEAR.',
+            'SPOILER ALERT:\nTHIS YEAR WILL\nALSO BE WEIRD.',
+            'NEW YEAR HACK:\nSET LOW GOALS AND\nNEVER BE\nDISAPPOINTED.',
+            'MY BANK ACCOUNT\nDOES NOT AGREE\nWITH MY NEW YEAR\nPLANS.',
+            'MIDNIGHT IS WAY\nPAST MY BEDTIME.',
+            'NEW YEAR, NEW ME\nIS THE FUNNIEST\nJOKE I TELL\nEVERY JANUARY.',
+            'CHEERS TO A YEAR\nOF PRETENDING\nI HAVE IT\nALL TOGETHER.',
+            'MY PLAN FOR THE\nNEW YEAR:\nNO PLAN.',
+            'THIS YEAR I WILL\nSTOP BUYING THINGS\nI DO NOT NEED.\nSTARTING TOMORROW.',
+            'WELCOME TO THE\nNEW YEAR.\nSAME CIRCUS,\nDIFFERENT CLOWNS.',
+            'MAY YOUR COFFEE\nBE STRONG AND YOUR\nMONDAYS BE SHORT.',
+            'I MADE A LIST OF\nALL MY GOALS.\nIT IS BLANK.',
+            'THEY SAY NEW YEAR\nNEW YOU.\nI SAY NEW YEAR\nNEW SNACKS.',
+            'THIS YEAR I AIM\nFOR AT LEAST ONE\nDAY WITHOUT A NAP.',
+            'MY RESOLUTION:\nEAT LESS CAKE.\nJUST KIDDING.\nMORE CAKE PLEASE.',
+            'NEW YEAR GOAL:\nFINALLY USE MY\nGYM MEMBERSHIP.\nWHO AM I KIDDING.',
+            'OPTIMISTIC ME:\nTHIS IS MY YEAR.\nREALISTIC ME:\nNOPE.',
+            'RING IN THE NEW\nYEAR WITH LOW\nEXPECTATIONS AND\nHIGH SNACKS.',
+            'THIS YEAR I WILL\nDO WHAT I SAID\nI WOULD DO\nLAST YEAR.',
+        ],
+        valentines: [
+            'MY LOVE LANGUAGE\nIS SARCASM.',
+            'ROSES ARE RED.\nVIOLETS ARE BLUE.\nI HATE POEMS.\nHERE IS A TACO.',
+            'YOU HAD ME AT\nFREE WIFI.',
+            'LOVE IS SHARING\nYOUR FRIES.\nJUST KIDDING.\nDO NOT TOUCH\nMY FRIES.',
+            'BE MY VALENTINE.\nOR NOT.\nI AM EATING THIS\nCHOCOLATE ANYWAY.',
+            'RELATIONSHIPS ARE\nGREAT UNTIL YOU\nHAVE TO PUT ON\nPANTS.',
+            'I LOVE YOU MORE\nTHAN COFFEE.\nBUT NOT ALWAYS.',
+            'I LOVE YOU LIKE\nA FAT KID LOVES\nCAKE.',
+            'CUPID CALLED.\nHE WANTS HIS\nARROW BACK.',
+            'ALL YOU NEED IS\nLOVE.\nAND MAYBE TACOS.\nDEFINITELY TACOS.',
+            'YOU ARE THE CHEESE\nTO MY MACARONI.',
+            'LOVE IS BLIND.\nMARRIAGE IS THE\nEYE OPENER.',
+            'I LOVE YOU EVEN\nWHEN I AM HUNGRY.\nAND THAT IS\nSAYING A LOT.',
+            'MY HEART IS FULL.\nMY WALLET IS\nEMPTY.',
+            'FORGET FLOWERS.\nBRING ME PIZZA.',
+            'VALENTINE, YOU\nSTOLE MY HEART.\nAND MY BLANKET.',
+            'LOVE IS NOT HAVING\nTO HOLD YOUR GAS\nIN ANYMORE.',
+            'TOGETHER WE ARE\nAN ODD COUPLE.\nBUT ODD IS FUN.',
+            'I LOVE YOU\nA LATTE.',
+            'WILL YOU BE MY\nVALENTINE?\nJUST NOD.\nI BOUGHT CANDY\nALREADY.',
+            'MY FAVORITE LOVE\nSTORY IS OURS.\nJUST KIDDING.\nIT IS ME AND FOOD.',
+            'I LIKE YOU EVEN\nWHEN I AM HANGRY.',
+            'WE GO TOGETHER\nLIKE COPY AND\nPASTE.',
+            'LOVE IS TELLING\nSOMEONE THEIR HAIR\nLOOKS GREAT\nWHEN IT DOES NOT.',
+            'YOU MAKE MY HEART\nSKIP A BEAT.\nOR MAYBE THAT IS\nTHE CAFFEINE.',
+            'YOU ARE MY\nFAVORITE\nNOTIFICATION.',
+            'SWIPE RIGHT ON\nLIFE.',
+            'HUGS AND KISSES\nAND LOTS OF WINE.',
+            'I LOVE YOU\nBUT STAY OUT\nOF MY SNACKS.',
+            'THEY SAY LOVE IS\nTHE BEST MEDICINE.\nBUT HAVE YOU TRIED\nCHOCOLATE?',
+        ],
+        stpatricks: [
+            'TODAY I AM 100%\nIRISH.\nOR CLOSE ENOUGH.',
+            'IRISH YOU A HAPPY\nST. PATRICK\'S DAY.',
+            'MAY YOUR TROUBLES\nBE LESS AND YOUR\nBLESSINGS MORE.',
+            'KEEP CALM AND\nPUT YOUR GREEN ON.',
+            'I AM NOT IRISH BUT\nKISS ME ANYWAY.',
+            'EAT, DRINK, AND\nBE IRISH.',
+            'SHENANIGANS.\nYOU HAD ME AT\nSHENANIGANS.',
+            'I CAME FOR THE\nGREEN BEER.\nYOU ARE WELCOME.',
+            'FEELING LUCKY?\nME NEITHER.\nBUT CHEERS.',
+            'MAY YOUR GLASS\nALWAYS BE HALF\nFULL.\nPREFERABLY GREEN.',
+            'SLAINTE!\nTHAT MEANS CHEERS\nAND I NEED MORE.',
+            'GREEN IS NOT JUST\nA COLOR.\nIT IS A LIFESTYLE.',
+            'PINCH ME AND\nI WILL PINCH BACK.',
+            'MORE GREEN BEER.\nLESS GREEN FOOD.',
+            'IRISH GOODBYE:\nLEAVING WITHOUT\nTELLING ANYONE.\nMY FAVORITE MOVE.',
+            'I BELIEVE IN\nLEPRECHAUNS.\nAND HAPPY HOUR.',
+            'MAY YOUR DAY BE\nTOUCHED BY A BIT\nOF IRISH LUCK.',
+            'MY LUCKY CHARM?\nCOFFEE.',
+            'TOP OF THE\nMORNING TO YOU.\nNOW PASS THE\nGREEN BEER.',
+            'PADDY TOLD ME TO\nBE MYSELF.\nPADDY DOES NOT\nGIVE GOOD ADVICE.',
+            'FOUR LEAF CLOVER:\nONE LEAF FOR HOPE,\nONE LEAF FOR\nFREE PARKING.',
+            'IRISH WISDOM:\nNEVER IRON A\nFOUR LEAF CLOVER.\nDO NOT PRESS\nYOUR LUCK.',
+            'EVERYONE IS IRISH\nON MARCH 17TH.\nEVEN MY CAT.',
+            'GREEN EGGS AND HAM\nARE NOT IRISH FOOD\nBUT I WILL EAT\nTHEM ANYWAY.',
+            'I PUT THE LUCK\nIN POTLUCK.',
+            'ST. PADDY SAYS:\nBE MERRY AND\nEAT POTATOES.',
+            'IN IRELAND THEY\nHAVE RAINBOWS.\nHERE WE HAVE\nSPRINKLES.',
+            'MAY YOUR POCKETS\nBE HEAVY AND YOUR\nHEART BE LIGHT.',
+            'THIS SHAMROCK HAS\nFOUR LEAVES.\nNONE OF THEM ARE\nFOR DIETING.',
+            'LUCKY ME.\nLUCKY YOU.\nLUCKY US.\nNOW LET US EAT.',
+        ],
+        easter: [
+            'SOME BUNNY\nLOVES YOU.',
+            'I AM JUST HERE\nFOR THE CHOCOLATE\nEGGS.',
+            'EGGS-CUSE ME.\nDID SOMEONE SAY\nCHOCOLATE?',
+            'HAPPY EASTER!\nTRY NOT TO EAT\nALL THE CANDY\nBEFORE NOON.',
+            'THE EASTER BUNNY\nATE ALL MY CANDY.\nOR SO I TOLD\nMY KIDS.',
+            'EASTER TIP:\nHIDE THE EGGS IN\nEASY SPOTS.\nYOU WILL FORGET\nTHE HARD ONES.',
+            'I BELIEVE IN THE\nEASTER BUNNY.\nAND NAPS.',
+            'MY EASTER DIET:\nSEE CHOCOLATE.\nEAT CHOCOLATE.',
+            'EGG HUNT STRATEGY:\nFOLLOW THE KID\nWHO KNOWS STUFF.',
+            'PEEPS ARE GREAT.\nAS DECORATIONS.\nNOT AS FOOD.',
+            'THE EASTER BUNNY\nHAS A BETTER JOB\nTHAN MOST OF US.',
+            'DO NOT PUT ALL\nYOUR EGGS IN\nONE BASKET.\nUNLESS IT IS\nCHOCOLATE.',
+            'I FOUND ALL THE\nEGGS.\nIN THE FRIDGE.\nWITH MAYO.',
+            'HOP TO IT.\nIT IS EASTER.\nTHE CANDY WILL\nNOT EAT ITSELF.',
+            'EASTER PLAN:\nCHOCOLATE FOR\nBREAKFAST, LUNCH,\nAND DINNER.',
+            'THIS BUNNY RUNS\nON CHOCOLATE AND\nGOOD VIBES.',
+            'JELLY BEANS ARE\nA VEGETABLE.\nCHANGE MY MIND.',
+            'EVERY BUNNY NEEDS\nSOME BUNNY\nTO LOVE.',
+            'MY FAVORITE COLOR\nIS EASTER EGG.',
+            'I TOLD THE KIDS\nI ATE THE CANDY.\nTHEY WERE NOT\nAMUSED.',
+            'CALORIES DO NOT\nCOUNT ON EASTER.\nI CHECKED.',
+            'WHAT DO YOU GET\nWHEN YOU CROSS\nA BUNNY AND ONION?\nA BUNION.',
+            'CHICKS BEFORE\nEGGS.\nOR IS IT EGGS\nBEFORE CHICKS?',
+            'HAVE AN EGG-STRA\nSPECIAL DAY.',
+            'COLORED EGGS AND\nSUGAR HIGHS.\nTHIS IS MY KIND\nOF HOLIDAY.',
+            'DEAR EASTER BUNNY,\nI HAVE BEEN GOOD.\nMOSTLY.\nOK NOT REALLY.',
+            'THE BEST PART OF\nEASTER IS THE 50%\nOFF CANDY SALE\nTHE NEXT DAY.',
+            'I EGG-ERCISE MY\nRIGHT TO EAT\nMORE CHOCOLATE.',
+            'SPRING HAS SPRUNG.\nTHE GRASS HAS RIZ.\nI ATE THE CANDY.\nI KNOW WHAT IT IZ.',
+            'HOPPY EASTER TO\nALL AND TO ALL\nA GOOD EGG.',
+        ],
+        aprilfools: [
+            'TRUST NO ONE\nTODAY.',
+            'TODAY IS THE ONE\nDAY MY LIES ARE\nSOCIALLY\nACCEPTABLE.',
+            'APRIL FOOLS!\nJUST KIDDING.\nOR AM I?',
+            'I AM GOING TO THE\nGYM TODAY.\nAPRIL FOOLS.',
+            'I WOKE UP EARLY\nTO BE PRODUCTIVE.\nTHAT WAS A GOOD\nJOKE.',
+            'MY WHOLE LIFE IS\nAN APRIL FOOLS\nJOKE.',
+            'BE CAREFUL TODAY.\nTRUST NOTHING.\nNOT EVEN THIS\nMESSAGE.',
+            'TODAY I TOLD MY\nBOSS I LOVE MY\nJOB.\nBIGGEST PRANK\nOF THE YEAR.',
+            'APRIL 1ST:\nTHE ONLY DAY\nPEOPLE QUESTION\nEVERYTHING ONLINE.\nAS THEY SHOULD.',
+            'FOOL ME ONCE,\nSHAME ON YOU.\nFOOL ME TWICE,\nI AM THE FOOL.',
+            'THE BEST PRANK:\nPRETENDING YOU\nHAVE YOUR LIFE\nTOGETHER.',
+            'I PUT A FAKE BUG\nIN THE KITCHEN.\nNOW I LIVE ALONE.',
+            'TODAY IS MY DAY\nTO SHINE.\nJUST KIDDING.\nI TRIPPED.',
+            'APRIL FOOLS DAY:\nTHE DAY I FINALLY\nFIT IN.',
+            'TOLD MY PLANTS\nTHEY ARE ADOPTED.\nAPRIL FOOLS.\nTHEY ALREADY KNEW.',
+            'NOTHING I SAY\nTODAY IS TRUE.\nINCLUDING THAT.',
+            'I REPLACED THE\nSUGAR WITH SALT.\nYOU ARE WELCOME.',
+            'GOOGLE SEARCH:\nHOW TO UNDO AN\nAPRIL FOOLS PRANK\nTHAT WENT TOO FAR.',
+            'MY DOG ATE MY\nHOMEWORK.\nAPRIL FOOLS.\nI HAVE NO DOG.\nOR HOMEWORK.',
+            'TODAY THE FLOOR\nIS LAVA.\nI AM AN ADULT.\nI DO NOT CARE.',
+            'I PRANKED MYSELF\nBY CHECKING MY\nBANK ACCOUNT.',
+            'WARNING:\nEVERYTHING YOU\nREAD TODAY IS\nA LIE.\nESPECIALLY THIS.',
+            'THE REAL JOKE IS\nMY SLEEP SCHEDULE.',
+            'APRIL FOOLS IDEA:\nGO TO WORK HAPPY.\nCONFUSE EVERYONE.',
+            'DID YOU KNOW?\nGULLIBLE IS NOT\nIN THE DICTIONARY.\nGO CHECK.',
+            'I SET ALL THE\nCLOCKS FORWARD.\nIT IS TOMORROW\nNOW.',
+            'THE REAL PRANK IS\nGROWING UP AND\nHAVING TO PAY\nBILLS.',
+            'I AM FULLY\nPRODUCTIVE TODAY.\nTHIS IS NOT\nA DRILL.\nJK IT TOTALLY IS.',
+            'PLOT TWIST:\nI WAS THE FOOL\nALL ALONG.',
+            'HAPPY APRIL FOOLS.\nMAY YOUR PRANKS BE\nFUNNY AND YOUR\nVICTIMS FORGIVING.',
+        ],
+        mothers: [
+            'MOM WAS RIGHT.\nABOUT EVERYTHING.',
+            'HOME IS WHERE\nMOM IS.',
+            'MOM: THE ONLY\nPERSON WHO CAN\nFIX EVERYTHING\nWITH A LOOK.',
+            'THANKS MOM FOR\nNOT SELLING ME\nON THE INTERNET.',
+            'MOM, I TURNED OUT\nAMAZING.\nYOU ARE WELCOME.',
+            'BEHIND EVERY GREAT\nKID IS A MOM WHO\nIS PRETTY SURE\nSHE IS MESSING\nIT ALL UP.',
+            'MOTHERS HOLD THEIR\nCHILDREN\'S HANDS\nFOR A WHILE AND\nTHEIR HEARTS\nFOREVER.',
+            'MOM: POWERED BY\nLOVE AND COFFEE.',
+            'I GOT IT FROM\nMY MAMA.',
+            'IF MOM SAYS NO,\nASK DAD.\nIF DAD SAYS NO,\nYOU ARE OUT\nOF LUCK.',
+            'MOTHER KNOWS BEST.\nESPECIALLY WHEN\nSHE SAYS BRING\nA JACKET.',
+            'MOM: CHEF, NURSE,\nCOUNSELOR, FRIEND,\nAND SUPERHERO.',
+            'THANKS MOM FOR\nPRETENDING MY ART\nWAS GOOD.',
+            'MOM, SORRY ABOUT\nMY TEENAGE YEARS.\nAND MY TWENTIES.\nAND LAST TUESDAY.',
+            'YOU CALL IT\nNAGGING.\nMOM CALLS IT\nCARING LOUDLY.',
+            'MOM: UNPAID UBER,\nUNTHANKED CHEF AND\nUNDERPAID HERO.',
+            'HAPPY MOTHERS DAY\nTO THE WOMAN\nWHO KNOWS WHERE\nEVERYTHING IS.',
+            'MOM LIFE:\nCOLD COFFEE,\nHOT MESS,\nFULL HEART.',
+            'THE MOST EXPENSIVE\nHAIRCUT I EVER GOT\nWAS FREE.\nTHANKS, MOM.',
+            'A MOM HUG LASTS\nLONG AFTER SHE\nLETS GO.',
+            'MOM SAID I COULD\nBE ANYTHING.\nSO I BECAME TIRED.',
+            'MY MOM IS MY\nSUPERHERO.\nNO CAPE NEEDED.',
+            'MOM: THE REASON\nI KNOW HOW TO\nDO LAUNDRY.\nAND FEEL GUILTY.',
+            'THEY SAY MOM\nKNOWS BEST.\nCAN CONFIRM.',
+            'THANKS MOM FOR\nALL THE TIMES YOU\nDID NOT LOSE IT.\nAND THE TIMES\nYOU DID.',
+            'MOM: A TITLE JUST\nABOVE QUEEN.',
+            'ROSES ARE RED.\nMOM IS THE BEST.\nI NEED MONEY.\nFORGET THE REST.',
+            'DEAR MOM, I OWE\nYOU BASICALLY\nEVERYTHING.\nLOVE, YOUR BEST\nINVESTMENT.',
+            'BEHIND EVERY KID\nWHO BELIEVES IN\nTHEMSELVES IS A\nMOM WHO BELIEVED\nFIRST.',
+            'MOM: THE WOMAN,\nTHE MYTH,\nTHE LEGEND,\nTHE TAXI DRIVER.',
+        ],
+        fathers: [
+            'DAD JOKES ARE HOW\nEYE ROLL.',
+            'MY DAD CAN BEAT\nUP YOUR DAD.\nAT DAD JOKES.',
+            'DAD: THE MAN,\nTHE MYTH,\nTHE BAD INFLUENCE.',
+            'DAD, THANKS FOR\nKILLING SPIDERS\nAND PRETENDING\nIT WAS EASY.',
+            'HAPPY FATHERS DAY\nTO THE GUY WHO\nSTILL THINKS HE\nIS FUNNY.',
+            'I GOT DAD A\nWORLD\'S BEST MUG.\nHE USES IT\nIRONICALLY.',
+            'DAD: A SON\'S FIRST\nHERO AND A\nDAUGHTER\'S FIRST\nLOVE.',
+            'DAD BOD:\nA FIGURE BUILT BY\nYEARS OF SNACKING\nAFTER BEDTIME.',
+            'MY DAD TAUGHT ME\nTO GRILL.\nMY MOM TAUGHT ME\nTO DIAL 911.',
+            'DADS ARE LIKE\nWIFI.\nYOU NOTICE WHEN\nTHEY ARE GONE.',
+            'DAD ALWAYS SAID\nBE YOURSELF.\nHE ALSO SAID\nSTOP THAT.',
+            'THANKS DAD FOR\nTHE BAD JOKES.\nI INHERITED\nEVERY SINGLE ONE.',
+            'HAPPY FATHERS DAY!\nNO, I DO NOT\nNEED MONEY.\nOK MAYBE A LITTLE.',
+            'DAD VOICE:\nACTIVATED.\nTHERMOSTAT:\nPROTECTED.',
+            'I LEARNED FROM\nTHE BEST.\nSORRY MOM, I MEAN\nDAD. FOR TODAY.',
+            'DAD, REMEMBER\nWHEN I ASKED FOR\nNOTHING?\nYOU DELIVERED.',
+            'TO THE WORLD YOU\nARE A DAD.\nTO US YOU ARE\nTHE WORLD.',
+            'A GOOD DAD LETS\nYOU WIN AT GAMES.\nA GREAT DAD DOES\nNOT.',
+            'DAD\'S COOKING:\nSMOKE DETECTOR IS\nOUR DINNER BELL.',
+            'MY DAD THINKS\nHE IS FUNNY.\nWE LET HIM\nBELIEVE IT.',
+            'I SMILE BECAUSE\nYOU ARE MY DAD.\nI LAUGH BECAUSE\nYOU CANNOT DO\nANYTHING ABOUT IT.',
+            'DAD, YOU ARE THE\nKING OF NAPS AND\nBAD PUNS.\nLONG MAY YOU NAP.',
+            'THANKS DAD FOR\nNOT LEAVING ME\nAT THE STORE.\nTHAT ONE TIME\nDOES NOT COUNT.',
+            'DAD, I LOVE YOU\nEVEN WHEN YOU\nEMBARRASS ME.\nWHICH IS ALWAYS.',
+            'LIKE FATHER,\nLIKE SON.\nEXCEPT THE HAIR.\nSORRY, DAD.',
+            'DEAR DAD, YOUR\nDAD JOKES HAVE\nOFFICIALLY\nGONE TOO FAR.\nKEEP GOING.',
+            'DAD: THANKS FOR\nALL THE LIFE\nLESSONS.\nALSO FOR THE\nMONEY.',
+            'BEING A DAD IS\nJUST WALKING\nAROUND THE HOUSE\nTURNING OFF\nLIGHTS.',
+            'MY DAD COULD FIX\nANYTHING.\nEXCEPT MY TASTE\nIN MUSIC.',
+            'DAD: SOMEHOW BOTH\nTHE COOLEST AND\nMOST EMBARRASSING\nPERSON I KNOW.',
+        ],
+        independence: [
+            'LAND OF THE FREE.\nHOME OF THE BRAVE.\nALSO FIREWORKS.',
+            'FREEDOM IS NOT\nFREE.\nBUT THE HOT DOGS\nARE.',
+            'RED, WHITE, AND\nBLUE.\nALSO KETCHUP\nAND MUSTARD.',
+            'MY DIET DECLARES\nINDEPENDENCE\nON THE FOURTH.',
+            'SPARKLERS ARE\nJUST AGGRESSIVE\nBIRTHDAY CANDLES.',
+            'AMERICA:\nTHE ONLY COUNTRY\nWHERE FIREWORKS\nAND HOTDOGS COUNT\nAS A HOLIDAY.',
+            'BBQ IS MY\nFAVORITE FOOD\nGROUP.',
+            'STARS, STRIPES,\nAND SNACKS.',
+            'BORN TO GRILL.',
+            'HAPPY BIRTHDAY\nAMERICA!\nYOU DO NOT LOOK\n250.',
+            'FREEDOM:\nALSO MEANS NO\nDIET TODAY.',
+            'LIBERTY AND\nJUSTICE FOR ALL.\nAND EXTRA\nMAYONNAISE.',
+            'MY SPIRIT ANIMAL\nIS A BALD EAGLE\nEATING A BURGER.',
+            'LET FREEDOM RING.\nAND THE GRILL\nSIZZLE.',
+            'I PLEDGE\nALLEGIANCE\nTO THE GRILL.',
+            'RED WHITE AND BBQ.',
+            'UNITED WE STAND.\nDIVIDED WE FALL.\nEITHER WAY\nWE EAT.',
+            'HOME OF THE BRAVE,\nLAND OF THE FREE,\nRULER OF THE\nGRILL.',
+            'NOTHING SAYS\nFREEDOM LIKE\nBLOWING STUFF UP\nIN YOUR YARD.',
+            'USA! USA! USA!\nTHAT IS THE WHOLE\nMESSAGE.',
+            'THE ONLY THING\nI AM BLOWING UP\nTODAY IS THE\nPOOL FLOAT.',
+            'PROUD TO BE AN\nAMERICAN.\nALSO PROUD OF\nMY POTATO SALAD.',
+            'TODAY WE CELEBRATE\nWITH FREEDOM\nAND CALORIES.',
+            'GOD BLESS\nAMERICA.\nAND WHOEVER\nINVENTED BBQ.',
+            'FIREWORKS:\nLOUD AND BEAUTIFUL.\nJUST LIKE\nMY FAMILY.',
+            'FREEDOM IS NOT\nDOING THE DISHES\nON A HOLIDAY.',
+            'LIFE, LIBERTY,\nAND THE PURSUIT\nOF HAPPINESS.\nAND PIE.',
+            'THE FOURTH IS\nALL ABOUT THREE\nTHINGS:\nFOOD, FUN, AND\nFIREWORKS.',
+            'HAPPY FOURTH!\nEAT LIKE NOBODY\nIS WATCHING.',
+            'I ONLY LOVE TWO\nTHINGS:\nTHIS COUNTRY AND\nBBQ RIBS.',
+        ],
+        labor: [
+            'LABOR DAY:\nTHE ONLY DAY WE\nCELEBRATE WORK\nBY NOT WORKING.',
+            'REST IN PEACE,\nMY MOTIVATION.\nSEE YOU TUESDAY.',
+            'I WORK HARD SO MY\nCAT CAN HAVE A\nNICE LIFE.',
+            'LABOR DAY MOOD:\nDO NOTHING.\nNAILED IT.',
+            'THE ONLY LABOR\nI AM DOING TODAY\nIS LIFTING MY\nFORK.',
+            'HAPPY LABOR DAY.\nNOW STOP LABORING.',
+            'WORK HARD.\nNAP HARDER.\nTHAT IS THE PLAN.',
+            'I DESERVE THIS\nDAY OFF.\nAND EVERY OTHER\nDAY, HONESTLY.',
+            'THE ONLY THING I\nAM LABORING OVER\nIS WHAT TO EAT.',
+            'LABOR DAY PLAN:\nGRILL.\nCHILL.\nREPEAT.',
+            'BYE BYE SUMMER.\nHELLO FALL.\nHELLO EXCUSES\nNOT TO GO OUTSIDE.',
+            'TODAY I CELEBRATE\nTHE AMERICAN DREAM\nOF DOING NOTHING.',
+            'OFFICIALLY DONE\nWITH SUMMER.\nUNOFFICIALLY\nSTILL IN DENIAL.',
+            'MONDAY OFF?\nTHIS IS NOT\nA DRILL.\nWAIT, YES IT IS.\nIT IS LABOR DAY.',
+            'MY BOSS SAYS\nI AM A HARD\nWORKER.\nHE IS NOT HERE\nTO CHECK TODAY.',
+            'THE BEST PART OF\nLABOR DAY IS THE\nNO LABOR PART.',
+            'WEEKEND STATUS:\nEXTENDED.\nMOOD:\nEXCELLENT.',
+            'I LOVE MY JOB.\nI JUST LOVE MY\nCOUCH MORE.',
+            'LAST BBQ OF\nTHE SUMMER.\nMAKE IT COUNT.',
+            'LABOR DAY RECIPE:\nONE HAMMOCK.\nONE DRINK.\nZERO PLANS.',
+            'SUMMER IS OVER\nBUT MY TAN LINES\nWILL LIVE ON.',
+            'TODAY WE REST.\nTOMORROW WE\nPRETEND TO WORK.',
+            'THREE DAY WEEKEND.\nTHIS IS WHAT\nDREAMS ARE MADE OF.',
+            'I AM TAKING TODAY\nOFF.\nFROM EVERYTHING.\nYES, EVERYTHING.',
+            'NOTHING SAYS\nFREEDOM LIKE A\nTHREE DAY WEEKEND.',
+            'IF TODAY IS A DAY\nOF REST, THEN I AM\nVERY WELL RESTED.',
+            'HAPPY LABOR DAY!\nNOW SOMEBODY PASS\nTHE CHIPS.',
+            'SUMMER OFFICIALLY\nENDS BUT MY LOVE\nFOR NAPS DOES NOT.',
+            'I EARNED THIS NAP.\nAND THIS SNACK.\nAND THIS DRINK.',
+            'KEEP CALM.\nIT IS JUST A\nTHREE DAY WEEKEND.\nDO NOT PANIC.',
+        ],
+        halloween: [
+            'BOO!\nDID I SCARE YOU?\nNO?\nOK, I WILL TRY\nHARDER NEXT YEAR.',
+            'MY COSTUME THIS\nYEAR IS A TIRED\nADULT.\nNO MASK NEEDED.',
+            'EAT, DRINK, AND\nBE SCARY.',
+            'WITCH BETTER\nHAVE MY CANDY.',
+            'IF THE BROOM FITS,\nFLY IT.',
+            'HALLOWEEN PLAN:\nEAT CANDY.\nBLAME THE KIDS.',
+            'I AM ONLY HERE\nFOR THE BOO-ZE.',
+            'TRICK OR TREAT.\nSMELL MY FEET.\nGIVE ME SOMETHING\nGOOD TO EAT.',
+            'GHOSTS ARE REAL.\nI HAVE THREE IN\nMY BROWSER TABS.',
+            'ON A SCALE OF ONE\nTO PUMPKIN SPICE,\nHOW BASIC AM I?',
+            'MY BLOOD TYPE IS\nCANDY CORN.',
+            'THE SCARIEST THING\nON HALLOWEEN\nIS MY BANK\nACCOUNT.',
+            'THIS IS MY RESTING\nWITCH FACE.',
+            'CALORIES DO NOT\nCOUNT ON\nHALLOWEEN.\nI CHECKED.',
+            'HALLOWEEN IS THE\nONLY DAY I CAN\nHIDE IN PUBLIC\nAND BE NORMAL.',
+            'CARVING PUMPKINS\nIS JUST ARTS AND\nCRAFTS FOR ADULTS\nWITH KNIVES.',
+            'I WANT SOMEONE TO\nLOOK AT ME THE WAY\nI LOOK AT\nHALLOWEEN CANDY.',
+            'DO NOT BE A BASIC\nWITCH.',
+            'MY NEIGHBORS THINK\nI DECORATE FOR\nHALLOWEEN.\nTHIS IS JUST\nHOW I LIVE.',
+            'SPOOKY SEASON\nIS MY SEASON.',
+            'JUST HERE FOR\nTHE CANDY TAX\nON MY KIDS.',
+            'I DRESS UP AS\nA RESPONSIBLE\nADULT.\nSCARIEST COSTUME\nEVER.',
+            'HOME IS WHERE THE\nHAUNT IS.',
+            'WARNING:\nI HAVE CANDY AND\nI AM NOT AFRAID\nTO EAT IT.',
+            'OCTOBER IS MY\nCARDIO MONTH.\nI RUN FROM MY\nPROBLEMS IN\nCOSTUME.',
+            'GHOULS JUST\nWANNA HAVE FUN.',
+            'SOMETHING WICKED\nTHIS WAY COMES.\nIT IS PROBABLY ME\nBEFORE COFFEE.',
+            'FULL MOON.\nEMPTY CANDY BOWL.\nSEND HELP.',
+            'I AM 100% SURE I\nWAS A WITCH IN\nA PAST LIFE.',
+            'CREEP IT REAL\nTHIS HALLOWEEN.',
+        ],
+        thanksgiving: [
+            'I AM THANKFUL FOR\nELASTIC PANTS.',
+            'GOBBLE TILL YOU\nWOBBLE.',
+            'MY FAMILY IS\nCRAZY BUT I LOVE\nTHEM.\nMOSTLY.',
+            'THANKSGIVING:\nTHE ONE DAY IT IS\nOK TO EAT YOUR\nFEELINGS.',
+            'PIE FIXES\nEVERYTHING.',
+            'I AM ON A\nSEAFOOD DIET.\nI SEE FOOD AT\nTHANKSGIVING\nAND I EAT IT ALL.',
+            'CALORIES DO NOT\nCOUNT TODAY.\nTHIS IS NOT UP\nFOR DEBATE.',
+            'THANKFUL FOR\nWIFI, FOOD,\nAND NAPS.\nIN THAT ORDER.',
+            'MAY YOUR TURKEY\nBE MOIST AND YOUR\nFAMILY BE QUIET.',
+            'I CAME. I ATE.\nI TOOK A NAP.',
+            'THANKSGIVING TIP:\nWEAR STRETCHY\nPANTS.',
+            'MY COOKING SKILL:\nORDERING A\nPRE-MADE TURKEY.',
+            'BE THANKFUL.\nIT COULD BE\nFRUITCAKE SEASON\nALREADY.',
+            'I ONLY HAVE PIES\nFOR YOU.',
+            'TURKEY: CHECK.\nSTUFFING: CHECK.\nSTRETCHY PANTS:\nDOUBLE CHECK.',
+            'NOT TO BRAG BUT\nI CAN FORGET WHAT\nI AM THANKFUL FOR\nIN FIVE MINUTES.',
+            'THANKFUL FOR\nTHIS FOOD.\nAND THE COUCH\nWAITING FOR ME.',
+            'THE PILGRIMS HAD\nNO WIFI AND STILL\nFOUND THINGS TO\nBE THANKFUL FOR.',
+            'FAMILY:\nCAN NOT LIVE WITH\nTHEM.\nCAN NOT EAT ALL\nTHIS FOOD ALONE.',
+            'I AM GRATEFUL\nFOR LEFTOVERS.',
+            'MY GRAVY BRINGS\nALL THE FOLKS\nTO THE TABLE.',
+            'THIS YEAR I AM\nTHANKFUL FOR\nSTRETCHY PANTS\nAND SECOND\nHELPINGS.',
+            'GIVE THANKS.\nEAT PIE.\nTAKE A NAP.\nTHAT IS THE WAY.',
+            'BLACK FRIDAY EVE\nIS MY FAVORITE\nHOLIDAY.',
+            'I DO NOT NEED\nA HOLIDAY TO EAT\nTOO MUCH.\nBUT IT HELPS.',
+            'THANKSGIVING:\nWHERE BEING OVER\nSTUFFED IS A GOAL,\nNOT A PROBLEM.',
+            'MAY YOUR STUFFING\nBE TASTY AND YOUR\nTURKEY NOT DRY.',
+            'THE ONLY MARATHON\nI RUN ON\nTHANKSGIVING IS\nTO THE BUFFET.',
+            'THANKFUL, BLESSED,\nAND VERY FULL.',
+            'TODAY WE GIVE\nTHANKS.\nTOMORROW WE SHOP.\nTONIGHT WE NAP.',
+        ],
+        christmas: [
+            'DEAR SANTA,\nI CAN EXPLAIN.',
+            'ALL I WANT FOR\nCHRISTMAS IS\nA NAP.',
+            'JINGLE BELLS.\nJINGLE BELLS.\nJINGLE ALL THE\nWAY TO THE COUCH.',
+            'I AM DREAMING OF\nA WHITE CHRISTMAS.\nBUT I WILL TAKE\nANY COLOR WITH\nGIFTS.',
+            'SANTA SAW YOUR\nBROWSER HISTORY.\nNO GIFTS THIS\nYEAR.',
+            'I HAVE BEEN NICE.\nMOSTLY.\nOK, SOMEWHAT.\nFINE. JUST GIVE\nME CHOCOLATE.',
+            'MERRY CHRISTMAS,\nYA FILTHY ANIMAL.',
+            'CHRISTMAS CALORIES\nDO NOT COUNT.',
+            'SANTA IS REAL.\nMY CREDIT CARD\nCAN PROVE IT.',
+            'WRAP GAME: STRONG.\nTAG GAME: WEAK.\nI FORGET WHO GETS\nWHAT EVERY YEAR.',
+            'THE TREE IS UP.\nTHE LIGHTS ARE ON.\nMY WALLET IS\nCRYING.',
+            'HO HO HO.\nNO NO NO.\nTHAT IS MY ANSWER\nTO HOLIDAY DIETS.',
+            'CHRISTMAS TO DO:\nBUY GIFTS.\nWRAP GIFTS.\nREGRET BUDGET.',
+            'ALL IS CALM.\nALL IS BRIGHT.\nALL MY MONEY IS\nGONE.',
+            'I RUN ON EGGNOG\nAND CHRISTMAS\nMOVIES.',
+            'THE BEST WAY TO\nSPREAD CHRISTMAS\nCHEER IS EATING\nALL THE COOKIES.',
+            'SANTA, I CAN\nEXPLAIN.\nACTUALLY, NO.\nLET ME START OVER.',
+            'SLEIGH ALL DAY.\nNAP ALL NIGHT.',
+            'BETTER NOT CRY.\nBETTER NOT POUT.\nSANTA IS ON A\nBUDGET THIS YEAR.',
+            'CHRISTMAS SPIRIT:\n50% MERRY.\n50% EXHAUSTED.',
+            'TANGLE THE LIGHTS.\nBURN THE COOKIES.\nFORGET THE GIFTS.\nNAILED IT.',
+            'MY WISH LIST IS\nJUST WIFI AND\nSILENCE.',
+            'SILENT NIGHT.\nHOLY NIGHT.\nALL IS CALM UNTIL\nTHE KIDS WAKE UP.',
+            'DECK THE HALLS.\nNOT THE FAMILY.',
+            'TOLD SANTA I WAS\nGOOD THIS YEAR.\nHE LAUGHED TOO.',
+            'FELIZ NAVI-DAD.\nJOKE.\nJUST A DAD JOKE.',
+            'CHRISTMAS MORNING:\nWAKE UP.\nEAT.\nOPEN GIFTS.\nNAP.',
+            'SANTA IS JUST A\nGUY WITH A LIST\nAND ANXIETY.\nI RELATE.',
+            'DUE TO INFLATION,\nSTOCKINGS WILL BE\nSMALLER THIS YEAR.\nSORRY.',
+            'MAY YOUR HOLIDAYS\nBE MERRY AND YOUR\nWIFI BE STRONG.',
+        ],
+    };
 
     async function sendText(source) {
         if (!textInput) return;
@@ -270,14 +719,24 @@ if (!roomId || !isValidRoom(roomId)) {
         });
     }
 
+    const activeHoliday = getNextHoliday();
+
     if (funnyBtn) {
+        let quoteSource, quotePool;
+        if (activeHoliday && holidayQuotes[activeHoliday.key]) {
+            funnyBtn.textContent = activeHoliday.name + ' Quote';
+            quoteSource = activeHoliday.key;
+            quotePool = holidayQuotes[activeHoliday.key];
+        } else {
+            quoteSource = 'funny';
+            quotePool = funnyTexts;
+        }
         funnyBtn.addEventListener('click', () => {
-            const funnyText =
-                funnyTexts[Math.floor(Math.random() * funnyTexts.length)];
+            const quote = quotePool[Math.floor(Math.random() * quotePool.length)];
             if (textInput) {
-                textInput.value = funnyText;
+                textInput.value = quote;
             }
-            void sendText('funny');
+            void sendText(quoteSource);
         });
     }
 
