@@ -56,7 +56,6 @@ struct ContentView: View {
                 config: sampleConfig,
                 message: effectiveText
             )
-            .scaleEffect(1.3)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
 
             // QR code anchored in the bottom-right corner.

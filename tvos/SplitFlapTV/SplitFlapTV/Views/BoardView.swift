@@ -5,12 +5,21 @@ private let CHARSET: [Character] = Array(
     " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.:!?-,;'\"()/@#$%&*+=<>[]{}|~\u{2018}\u{2019}\u{201C}\u{201D}°–—…"
 )
 
+/// O(1) lookup table for character → index in CHARSET.
+private let CHARSET_INDEX: [Character: Int] = {
+    var dict = [Character: Int](minimumCapacity: CHARSET.count)
+    for (i, c) in CHARSET.enumerated() {
+        dict[c] = i
+    }
+    return dict
+}()
+
 /// Advance a character one step through CHARSET toward the target.
 /// Returns the next character, or nil if already at target.
 private func advanceChar(_ current: Character, toward target: Character) -> Character? {
     guard current != target else { return nil }
 
-    guard let currentIndex = CHARSET.firstIndex(of: current) else {
+    guard let currentIndex = CHARSET_INDEX[current] else {
         // Unknown character, snap to target
         return target
     }
@@ -43,20 +52,21 @@ struct BoardView: View {
     }
 
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 8) {
             ForEach(Array(currentBoard.enumerated()), id: \.offset) { rowIndex, row in
-                HStack(spacing: 4) {
+                HStack(spacing: 5) {
                     ForEach(Array(row.enumerated()), id: \.offset) { colIndex, char in
-                        TileView(character: char)
+                        TileView(character: char).equatable()
                     }
                 }
             }
         }
-        .padding(24)
+        .padding(31)
         .background(
-            RoundedRectangle(cornerRadius: 20)
+            RoundedRectangle(cornerRadius: 26)
                 .fill(Color(.sRGB, red: 0.17, green: 0.17, blue: 0.17, opacity: 1.0))
         )
+        .drawingGroup()
         .onAppear {
             initializeBoard()
         }
@@ -94,7 +104,7 @@ struct BoardView: View {
         guard currentBoard.count == target.count else { return }
 
         while !Task.isCancelled {
-            var anyChanged = false
+            var changedCount = 0
             var newBoard = currentBoard
 
             // Advance each tile one step toward its target
@@ -108,102 +118,60 @@ struct BoardView: View {
 
                     if let next = advanceChar(current, toward: targetChar) {
                         newBoard[row][col] = next
-                        anyChanged = true
+                        changedCount += 1
                     }
                 }
             }
 
             // If nothing changed, we're done
-            if !anyChanged {
+            if changedCount == 0 {
                 break
             }
 
             // Commit the new board state (single batched update)
             currentBoard = newBoard
 
-            // Play one click sound per tick
-            FlipSoundPlayer.shared.playClick()
+            // Play click sound whose density matches the number of active tiles
+            FlipSoundPlayer.shared.playClick(activeTiles: changedCount)
 
-            // Wait before next tick (~50ms per step, matching web app feel)
-            try? await Task.sleep(nanoseconds: 50_000_000)
+            // Wait before next tick (~60ms per step, slightly slower than web
+            // to give older Apple TV hardware breathing room)
+            try? await Task.sleep(nanoseconds: 60_000_000)
         }
     }
 }
 
-/// A single split-flap tile - purely presentational, no animation logic.
-private struct TileView: View {
+/// A single split-flap tile - simplified for performance on older Apple TV hardware.
+/// Uses a flat background + horizontal divider instead of two gradient-clipped halves,
+/// cutting per-tile view count from ~15 to ~5 and eliminating expensive
+/// LinearGradient / UnevenRoundedRectangle rendering.
+private struct TileView: View, Equatable {
     let character: Character
 
-    var body: some View {
-        ZStack {
-            // Background
-            RoundedRectangle(cornerRadius: 4)
-                .fill(Color(.sRGB, white: 0.08, opacity: 1.0))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 4)
-                        .stroke(Color.black, lineWidth: 1)
-                )
-
-            // Top half
-            VStack(spacing: 0) {
-                HalfTileView(character: character, half: .top)
-                Spacer()
-            }
-
-            // Bottom half
-            VStack(spacing: 0) {
-                Spacer()
-                HalfTileView(character: character, half: .bottom)
-            }
-        }
-        .frame(width: 60, height: 80)
-    }
-}
-
-/// Half of a split-flap tile (top or bottom)
-private struct HalfTileView: View {
-    let character: Character
-    let half: Half
-
-    enum Half {
-        case top, bottom
+    static func == (lhs: TileView, rhs: TileView) -> Bool {
+        lhs.character == rhs.character
     }
 
     var body: some View {
         ZStack {
-            // Background gradient
-            LinearGradient(
-                gradient: Gradient(colors: half == .top ? [
-                    Color(.sRGB, white: 0.12, opacity: 1.0),
-                    Color(.sRGB, white: 0.10, opacity: 1.0)
-                ] : [
-                    Color(.sRGB, white: 0.10, opacity: 1.0),
-                    Color(.sRGB, white: 0.06, opacity: 1.0)
-                ]),
-                startPoint: .top,
-                endPoint: .bottom
-            )
+            // Tile background – slight vertical gradient faked with two stacked rects
+            VStack(spacing: 0) {
+                Color(.sRGB, white: 0.11, opacity: 1.0)
+                Color(.sRGB, white: 0.08, opacity: 1.0)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 5))
 
-            // Text (positioned to show correct half)
+            // Character
             Text(String(character))
-                .font(.system(size: 50, weight: .semibold, design: .monospaced))
+                .font(.system(size: 65, weight: .semibold, design: .monospaced))
                 .foregroundColor(.white)
-                .frame(width: 60, height: 80)
-                .offset(y: half == .top ? 20 : -20)
+
+            // Horizontal split line
+            Rectangle()
+                .fill(Color(.sRGB, white: 0.02, opacity: 1.0))
+                .frame(height: 2)
         }
-        .frame(width: 60, height: 40)
-        .clipShape(
-            half == .top ?
-            UnevenRoundedRectangle(topLeadingRadius: 4, topTrailingRadius: 4) :
-            UnevenRoundedRectangle(bottomLeadingRadius: 4, bottomTrailingRadius: 4)
-        )
-        .overlay(
-            half == .top ?
-            UnevenRoundedRectangle(topLeadingRadius: 4, topTrailingRadius: 4)
-                .stroke(Color.black, lineWidth: 1) :
-            UnevenRoundedRectangle(bottomLeadingRadius: 4, bottomTrailingRadius: 4)
-                .stroke(Color.black, lineWidth: 1)
-        )
+        .frame(width: 78, height: 104)
     }
 }
 
