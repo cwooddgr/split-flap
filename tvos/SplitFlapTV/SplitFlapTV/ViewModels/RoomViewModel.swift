@@ -9,6 +9,13 @@ import FirebaseFirestore
 /// - Publishes RoomState when the document changes.
 /// - Proactively refreshes auth token before expiry.
 /// - Health checks to detect connection failures and auto-reconnect.
+/// Print only in DEBUG builds.
+private func debugLog(_ message: @autoclosure () -> String) {
+    #if DEBUG
+    print(message())
+    #endif
+}
+
 final class RoomViewModel: ObservableObject {
     @Published var state: RoomState?
     @Published var errorMessage: String?
@@ -74,25 +81,25 @@ final class RoomViewModel: ObservableObject {
     private func forceReauthenticate(completion: @escaping () -> Void) {
         let auth = Auth.auth()
 
-        print("[RECONNECT] Force re-authenticating (sign out + sign in)...")
+        debugLog("[RECONNECT] Force re-authenticating (sign out + sign in)...")
 
         // Sign out first
         do {
             try auth.signOut()
-            print("[RECONNECT] Signed out successfully")
+            debugLog("[RECONNECT] Signed out successfully")
         } catch {
-            print("[RECONNECT] Sign out failed (may already be signed out): \(error.localizedDescription)")
+            debugLog("[RECONNECT] Sign out failed (may already be signed out): \(error.localizedDescription)")
         }
 
         // Sign in fresh
         auth.signInAnonymously { [weak self] _, error in
             DispatchQueue.main.async {
                 if let error = error {
-                    print("[RECONNECT] Re-auth failed: \(error.localizedDescription)")
+                    debugLog("[RECONNECT] Re-auth failed: \(error.localizedDescription)")
                     self?.errorMessage = "Re-auth error: \(error.localizedDescription)"
                     self?.isReconnecting = false
                 } else {
-                    print("[RECONNECT] Re-authentication successful")
+                    debugLog("[RECONNECT] Re-authentication successful")
                     completion()
                 }
             }
@@ -108,7 +115,7 @@ final class RoomViewModel: ObservableObject {
 
         let db = Firestore.firestore()
 
-        print("[LISTENER] Setting up Firestore listener for room: \(roomId)")
+        debugLog("[LISTENER] Setting up Firestore listener for room: \(roomId)")
 
         listener = db.collection("rooms").document(roomId)
             .addSnapshotListener { [weak self] snapshot, error in
@@ -116,7 +123,7 @@ final class RoomViewModel: ObservableObject {
                     guard let self = self else { return }
 
                     if let error = error {
-                        print("[ERROR] Snapshot listener error: \(error.localizedDescription)")
+                        debugLog("[ERROR] Snapshot listener error: \(error.localizedDescription)")
                         self.errorMessage = "Listen error: \(error.localizedDescription)"
                         self.handleConnectionFailure()
                         return
@@ -127,12 +134,12 @@ final class RoomViewModel: ObservableObject {
                         if !snapshot.metadata.isFromCache {
                             self.lastServerResponseTime = Date()
                             if !self.isConnected {
-                                print("[STATE] Connection restored")
+                                debugLog("[STATE] Connection restored")
                             }
                             self.isConnected = true
-                            print("[SNAPSHOT] Server response - updating lastServerResponseTime")
+                            debugLog("[SNAPSHOT] Server response - updating lastServerResponseTime")
                         } else {
-                            print("[SNAPSHOT] Cache response - NOT updating lastServerResponseTime")
+                            debugLog("[SNAPSHOT] Cache response - NOT updating lastServerResponseTime")
                         }
                     }
 
@@ -158,7 +165,7 @@ final class RoomViewModel: ObservableObject {
     // MARK: - Health Check
 
     private func startHealthCheck() {
-        print("[HEALTH] Starting health check interval (every 5 min)")
+        debugLog("[HEALTH] Starting health check interval (every 5 min)")
         healthCheckTimer = Timer.scheduledTimer(withTimeInterval: healthCheckInterval, repeats: true) { [weak self] _ in
             self?.performHealthCheck()
         }
@@ -166,7 +173,7 @@ final class RoomViewModel: ObservableObject {
 
     private func performHealthCheck() {
         let timeSinceLastResponse = Date().timeIntervalSince(lastServerResponseTime)
-        print("[HEALTH] Health check tick - performing active ping (last response: \(Int(timeSinceLastResponse))s ago)")
+        debugLog("[HEALTH] Health check tick - performing active ping (last response: \(Int(timeSinceLastResponse))s ago)")
 
         let db = Firestore.firestore()
         db.collection("rooms").document(roomId).getDocument { [weak self] snapshot, error in
@@ -174,7 +181,7 @@ final class RoomViewModel: ObservableObject {
 
             DispatchQueue.main.async {
                 if let error = error {
-                    print("[HEALTH] Ping failed: \(error.localizedDescription)")
+                    debugLog("[HEALTH] Ping failed: \(error.localizedDescription)")
                     let elapsed = Date().timeIntervalSince(self.lastServerResponseTime)
                     if elapsed > self.offlineThreshold {
                         self.handleConnectionFailure()
@@ -185,12 +192,12 @@ final class RoomViewModel: ObservableObject {
                 if snapshot?.metadata.isFromCache == false {
                     self.lastServerResponseTime = Date()
                     self.isConnected = true
-                    print("[HEALTH] Ping successful - connection confirmed alive")
+                    debugLog("[HEALTH] Ping successful - connection confirmed alive")
                 } else {
-                    print("[HEALTH] Ping returned cached data - checking threshold")
+                    debugLog("[HEALTH] Ping returned cached data - checking threshold")
                     let elapsed = Date().timeIntervalSince(self.lastServerResponseTime)
                     if elapsed > self.offlineThreshold {
-                        print("[HEALTH] Over threshold (\(Int(elapsed))s > \(Int(self.offlineThreshold))s) - attempting reconnect")
+                        debugLog("[HEALTH] Over threshold (\(Int(elapsed))s > \(Int(self.offlineThreshold))s) - attempting reconnect")
                         self.handleConnectionFailure()
                     }
                 }
@@ -201,7 +208,7 @@ final class RoomViewModel: ObservableObject {
     // MARK: - Token Refresh
 
     private func startTokenRefresh() {
-        print("[TOKEN] Starting proactive token refresh interval (every 55 min)")
+        debugLog("[TOKEN] Starting proactive token refresh interval (every 55 min)")
         tokenRefreshTimer = Timer.scheduledTimer(withTimeInterval: tokenRefreshInterval, repeats: true) { [weak self] _ in
             self?.refreshAuthToken()
         }
@@ -209,16 +216,16 @@ final class RoomViewModel: ObservableObject {
 
     private func refreshAuthToken() {
         guard let user = Auth.auth().currentUser else {
-            print("[TOKEN] No current user - skipping refresh")
+            debugLog("[TOKEN] No current user - skipping refresh")
             return
         }
 
-        print("[TOKEN] Proactively refreshing auth token before expiry")
+        debugLog("[TOKEN] Proactively refreshing auth token before expiry")
         user.getIDTokenForcingRefresh(true) { token, error in
             if let error = error {
-                print("[TOKEN] Refresh failed: \(error.localizedDescription)")
+                debugLog("[TOKEN] Refresh failed: \(error.localizedDescription)")
             } else {
-                print("[TOKEN] Auth token refreshed successfully")
+                debugLog("[TOKEN] Auth token refreshed successfully")
             }
         }
     }
@@ -227,25 +234,25 @@ final class RoomViewModel: ObservableObject {
 
     private func handleConnectionFailure() {
         guard !isReconnecting else {
-            print("[RECONNECT] Already reconnecting, skipping")
+            debugLog("[RECONNECT] Already reconnecting, skipping")
             return
         }
 
         isReconnecting = true
         isConnected = false
 
-        print("[RECONNECT] Attempting full reconnect - teardown and rebuild listener")
+        debugLog("[RECONNECT] Attempting full reconnect - teardown and rebuild listener")
 
         // Remove existing listener
         if listener != nil {
-            print("[RECONNECT] Unsubscribing existing listener")
+            debugLog("[RECONNECT] Unsubscribing existing listener")
             listener?.remove()
             listener = nil
         }
 
         // Force re-authenticate and rebuild listener
         forceReauthenticate { [weak self] in
-            print("[RECONNECT] Setting up new Firestore listener")
+            debugLog("[RECONNECT] Setting up new Firestore listener")
             self?.startListening()
             self?.isReconnecting = false
         }

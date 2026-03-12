@@ -2,7 +2,7 @@ import SwiftUI
 import FirebaseCore
 
 @main
-struct SplitFlapTVApp: App {
+struct FlipFlapApp: App {
     init() {
         FirebaseApp.configure()
     }
