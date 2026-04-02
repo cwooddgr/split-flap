@@ -408,8 +408,8 @@ button:active {
 .cross-promo-icon {
     display: block;
     margin: 0 auto 16px;
-    width: 80px;
-    max-width: 80px;
+    width: 140px;
+    max-width: 140px;
     border-radius: 10px;
 }
 
