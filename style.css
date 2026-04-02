@@ -373,6 +373,7 @@ button:active {
 /* Controller page specifics */
 .controller-container {
     max-width: 640px;
+    padding-top: 10px;
 }
 
 
