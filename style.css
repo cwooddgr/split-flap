@@ -375,11 +375,6 @@ button:active {
     max-width: 640px;
 }
 
-.controller-title {
-    color: #ffffff;
-    margin-bottom: 6px;
-    font-size: 26px;
-}
 
 .controller-subtitle {
     color: rgba(255, 255, 255, 0.75);
