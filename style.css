@@ -400,13 +400,15 @@ button:active {
 
 .cross-promo {
     margin-top: 32px;
+    padding: 0 20px;
     text-align: center;
 }
 
 .cross-promo-icon {
     display: block;
     margin: 0 auto 16px;
-    width: 120px;
+    width: 80px;
+    max-width: 80px;
     border-radius: 10px;
 }
 
