@@ -749,20 +749,5 @@ if (!roomId || !isValidRoom(roomId)) {
         });
     }
 
-    // Show a QR code for this controller page (same room), so another
-    // phone can quickly join as a second remote.
-    const remoteQrEl = document.getElementById('remote-qrcode');
-    if (remoteQrEl && window.QRCode) {
-        const url = window.location.href;
-        // eslint-disable-next-line no-new
-        new QRCode(remoteQrEl, {
-            text: url,
-            width: 72,
-            height: 72,
-            colorDark: '#000000',
-            colorLight: '#ffffff',
-            correctLevel: window.QRCode.CorrectLevel.M,
-        });
-    }
 })();
 

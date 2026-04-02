@@ -398,15 +398,27 @@ button:active {
     font-size: 14px;
 }
 
-.remote-qr-wrapper {
-    margin-top: 20px;
-    display: flex;
-    justify-content: center;
+.cross-promo {
+    margin-top: 32px;
+    text-align: center;
 }
 
-#remote-qrcode {
-    width: 72px;
-    height: 72px;
+.cross-promo-icon {
+    display: block;
+    margin: 0 auto 16px;
+    width: 120px;
+    border-radius: 10px;
+}
+
+.cross-promo-text {
+    color: #888;
+    font-size: 13px;
+    line-height: 1.4;
+    margin: 0 0 12px;
+}
+
+.app-store-badge img {
+    height: 40px;
 }
 
 
