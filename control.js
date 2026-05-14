@@ -75,6 +75,12 @@ if (!roomId || !isValidRoom(roomId)) {
         return new Date(year, month, day);
     }
 
+    function getLastWeekdayOfMonth(year, month, weekday) {
+        const last = new Date(year, month + 1, 0);
+        const offset = (last.getDay() - weekday + 7) % 7;
+        return new Date(year, month, last.getDate() - offset);
+    }
+
     function getNextHoliday() {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -88,10 +94,12 @@ if (!roomId || !isValidRoom(roomId)) {
                 { key: 'easter', name: 'Easter', date: getEasterDate(year) },
                 { key: 'aprilfools', name: "April Fool's Day", date: new Date(year, 3, 1) },
                 { key: 'mothers', name: "Mother's Day", date: getNthWeekdayOfMonth(year, 4, 0, 2) },
+                { key: 'memorial', name: 'Memorial Day', date: getLastWeekdayOfMonth(year, 4, 1) },
                 { key: 'fathers', name: "Father's Day", date: getNthWeekdayOfMonth(year, 5, 0, 3) },
                 { key: 'independence', name: 'Independence Day', date: new Date(year, 6, 4) },
                 { key: 'labor', name: 'Labor Day', date: getNthWeekdayOfMonth(year, 8, 1, 1) },
                 { key: 'halloween', name: 'Halloween', date: new Date(year, 9, 31) },
+                { key: 'veterans', name: 'Veterans Day', date: new Date(year, 10, 11) },
                 { key: 'thanksgiving', name: 'Thanksgiving', date: getNthWeekdayOfMonth(year, 10, 4, 4) },
                 { key: 'christmas', name: 'Christmas', date: new Date(year, 11, 25) },
             );
