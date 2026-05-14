@@ -1,67 +1,48 @@
-# Split-Flap TV (tvOS)
+# Flip Flap tvOS
 
-This folder is the home for a future native tvOS client for the split-flap display.
+Native tvOS client for the Flip Flap split-flap message board. Mirrors the web display behavior on Apple TV, connects to the same Firebase backend, and renders a 21×8 split-flap grid in SwiftUI.
 
-The goal is for this app to:
+- **Current version**: 1.1 (build 2)
+- **Bundle ID**: `co.dgrlabs.flipflap`
+- **Deployment target**: tvOS 17.0
+- **Devices**: Apple TV HD (4th gen), Apple TV 4K (all generations)
 
-- Use the **same backend protocol** and Firestore document shape as the web client.
-- Render a native SwiftUI split-flap board using the shared domain concepts.
+## Project layout
 
-See:
-
-- `../docs/PROTOCOL.md` for the canonical protocol and domain model.
-- `../shared/protocol.ts` for TypeScript interfaces that mirror the protocol.
-
-## High-level design
-
-- A tvOS SwiftUI app with:
-  - `SplitFlapTVApp` – the app entry point.
-  - `ContentView` – root view; will own the connection to `rooms/{roomId}`.
-  - Future views like `BoardView` and `TileView` for rendering the board.
-- A small set of Swift models equivalent to the TypeScript interfaces:
-  - `BoardConfig`
-  - `Message`
-  - `RoomState`
-
-These models will map directly onto the Firestore documents described in
-`docs/PROTOCOL.md`.
-
-## Suggested file structure (inside this folder)
-
-You can use the following layout when you create the real Xcode project:
-
-```text
-tvos/
-  SplitFlapTVApp.swift     # @main entry point
-  ContentView.swift        # root view
-  Models/
-    RoomState.swift        # Swift models for protocol
-  Views/
-    BoardView.swift        # renders the board from text
-    TileView.swift         # renders a single flap tile
+```
+SplitFlapTV/
+  SplitFlapTV.xcodeproj
+  SplitFlapTV/
+    SplitFlapTVApp.swift          # @main entry point
+    ContentView.swift             # Root view: room ID, QR toggle, board
+    SoundEffects.swift            # Click sound via AVAudioEngine
+    GoogleService-Info.plist      # Firebase config (not in git)
+    Models/
+      RoomState.swift             # BoardConfig, RoomState
+    ViewModels/
+      RoomViewModel.swift         # Firestore subscription + anonymous auth
+    Views/
+      BoardView.swift             # Grid + animation coordinator + TileView
+      BoardLayout.swift           # Word-wrap / centering (Swift port of splitflap.js)
+      QRCodeView.swift            # QR code via CoreImage
+    Assets.xcassets/              # App icon, top shelf, accent color
 ```
 
-## How to create the Xcode project
+See the repository root for the canonical protocol (`docs/PROTOCOL.md`), the web client, and overall architecture notes (`CLAUDE.md`).
 
-1. Open Xcode.
-2. Choose **File → New → Project…**
-3. Platform: **tvOS**, Template: **App**.
-4. Name it something like `SplitFlapTV`.
-5. For the location, point Xcode at this `tvos` folder.
-6. Let Xcode generate the `.xcodeproj` and starter SwiftUI files.
-7. Replace or augment the generated files with:
-   - `SplitFlapTVApp.swift` (see example in this folder).
-   - `ContentView.swift`.
-   - Additional models/views as needed.
+## Building
 
-## Placeholder SwiftUI files
+1. Open `SplitFlapTV/SplitFlapTV.xcodeproj` in Xcode.
+2. Ensure `GoogleService-Info.plist` is present in the `SplitFlapTV` target (download from the Firebase console for the `co.dgrlabs.flipflap` app if missing).
+3. Firebase dependencies are managed via Swift Package Manager — Xcode resolves them automatically on first build.
+4. Select a tvOS 17+ simulator or Apple TV device and Build & Run (⌘R).
 
-This folder also contains minimal SwiftUI files that you can drop into the
-generated project:
+## Architecture notes
 
-- `SplitFlapTVApp.swift` – basic tvOS app entry.
-- `ContentView.swift` – placeholder UI that explains the future plan.
+- **Animation coordinator**: a single `Task` advances all tiles one step per ~50ms tick, with one batched `currentBoard` state update per tick. Per-tile async tasks were too slow on A8 hardware (see commit `afed3f3`).
+- **Layout**: 21 columns × 8 rows (web uses 21 × 6). Both platforms share the same word-wrap + centering algorithm and 74-character `CHARSET`.
+- **Connection resilience**: the app forces a fresh anonymous auth on wake and uses listener teardown/rebuild on reconnect rather than `enableNetwork`.
 
-These are intentionally simple and do **not** include any Firebase code yet.
+## Screenshots
 
-
+App Store screenshots live in `../Flip Flap tvOS Screenshots/`.

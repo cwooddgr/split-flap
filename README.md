@@ -40,7 +40,7 @@ The display shows a grid of animated split‑flap cells; a separate “remote”
   - `shared/protocol.ts` – Shared TypeScript description of the room protocol.
   - `docs/PROTOCOL.md` – Human‑readable description of the Firestore data model and protocol.
 
-- **tvOS app**
+- **tvOS app** (current version: **1.1**, build 2)
   - `tvos/README.md` – tvOS‑specific notes.
   - `tvos/SplitFlapTV/` – SwiftUI tvOS project.
     - `SplitFlapTVApp.swift` – App entry point.
