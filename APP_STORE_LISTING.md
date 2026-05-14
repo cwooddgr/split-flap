@@ -27,7 +27,7 @@ Rated 4+ — No objectionable content.
 
 ---
 
-## Version 1.1
+## Version 1.0
 
 ### Promotional Text (170 characters max — can be updated without a new build)
 Turn your Apple TV into a beautiful retro split-flap display. Send messages from your phone and watch them flip into place with realistic mechanical sounds.
@@ -58,8 +58,8 @@ PERFECT FOR
 
 Flip Flap connects securely through the cloud so your phone remote works from anywhere on any network. Messages are encrypted in transit and rooms expire automatically.
 
-### What's New (for version 1.1)
-_TODO: fill in release notes before submitting._
+### What's New (for version 1.0)
+Initial release.
 
 ### Keywords (100 characters max, comma-separated)
 split-flap,message board,display,sign,retro,flip,quote,signage,welcome,announcement

@@ -2,7 +2,7 @@
 
 Native tvOS client for the Flip Flap split-flap message board. Mirrors the web display behavior on Apple TV, connects to the same Firebase backend, and renders a 21×8 split-flap grid in SwiftUI.
 
-- **Current version**: 1.1 (build 2)
+- **Current version**: 1.0 (build 1)
 - **Bundle ID**: `co.dgrlabs.flipflap`
 - **Deployment target**: tvOS 17.0
 - **Devices**: Apple TV HD (4th gen), Apple TV 4K (all generations)
