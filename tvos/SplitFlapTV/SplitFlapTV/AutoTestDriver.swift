@@ -15,9 +15,9 @@ import FirebaseFirestore
 @MainActor
 final class AutoTestDriver {
     /// Master switch. When true the app uses `roomId` instead of a random
-    /// room so the metrics doc has a known address. Flip to false (or strip
-    /// this file) before any release build work.
-    static let enabled = true
+    /// room so the metrics doc has a known address. Off by default so DEBUG
+    /// builds behave normally; flip on for self-driving latency runs.
+    static let enabled = false
     static let roomId = "DBGTEST1"
 
     static let shared = AutoTestDriver()
