@@ -187,17 +187,22 @@ struct BoardView: View {
     }
 
     /// Tile at rest: background halves, character, split line.
+    ///
+    /// Copied `GraphicsContext` values share the canvas but carry their own
+    /// clip/transform state — unlike `drawLayer`, they don't allocate a
+    /// transparency layer. With 168 tiles per frame at 4K, per-tile layers
+    /// starved the main thread for seconds on A10X hardware (Apple TV 4K
+    /// 1st gen), so no `drawLayer` anywhere in the draw path.
     private func drawStaticTile(
         in context: inout GraphicsContext,
         rect: CGRect,
         glyph: GraphicsContext.ResolvedText
     ) {
-        context.drawLayer { layer in
-            layer.clip(to: Path(roundedRect: rect, cornerRadius: Metrics.cornerRadius))
-            fillHalves(in: &layer, rect: rect)
-            layer.draw(glyph, at: CGPoint(x: rect.midX, y: rect.midY))
-            drawSplitLine(in: &layer, rect: rect)
-        }
+        var tile = context
+        tile.clip(to: Path(roundedRect: rect, cornerRadius: Metrics.cornerRadius))
+        fillHalves(in: &tile, rect: rect)
+        tile.draw(glyph, at: CGPoint(x: rect.midX, y: rect.midY))
+        drawSplitLine(in: &tile, rect: rect)
     }
 
     /// Tile mid-flip: new top half revealed behind a falling flap that carries
@@ -216,52 +221,49 @@ struct BoardView: View {
         let topRect = CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height / 2)
         let bottomRect = CGRect(x: rect.minX, y: rect.midY, width: rect.width, height: rect.height / 2)
 
-        context.drawLayer { layer in
-            layer.clip(to: Path(roundedRect: rect, cornerRadius: Metrics.cornerRadius))
+        // Same copied-context technique as drawStaticTile — clip and
+        // transform state without drawLayer's per-tile transparency layers.
+        var tile = context
+        tile.clip(to: Path(roundedRect: rect, cornerRadius: Metrics.cornerRadius))
 
-            // Static layers behind the flap: new character's top half,
-            // old character's bottom half.
-            fillHalves(in: &layer, rect: rect)
-            layer.drawLayer { top in
-                top.clip(to: Path(topRect))
-                top.draw(newGlyph, at: center)
-            }
-            layer.drawLayer { bottom in
-                bottom.clip(to: Path(bottomRect))
-                bottom.draw(oldGlyph, at: center)
-            }
+        // Static layers behind the flap: new character's top half,
+        // old character's bottom half.
+        fillHalves(in: &tile, rect: rect)
+        var top = tile
+        top.clip(to: Path(topRect))
+        top.draw(newGlyph, at: center)
+        var bottom = tile
+        bottom.clip(to: Path(bottomRect))
+        bottom.draw(oldGlyph, at: center)
 
-            // The moving flap, hinged at the split line.
-            if eased < 0.5 {
-                // First half: old top half falling toward the viewer.
-                let scale = 1 - eased * 2
-                layer.drawLayer { flap in
-                    flap.translateBy(x: 0, y: rect.midY)
-                    flap.scaleBy(x: 1, y: scale)
-                    flap.translateBy(x: 0, y: -rect.midY)
-                    flap.clip(to: Path(topRect))
-                    flap.fill(Path(topRect), with: .color(Color(.sRGB, white: 0.11, opacity: 1.0)))
-                    flap.draw(oldGlyph, at: center)
-                    // Darken as the flap tilts toward edge-on.
-                    flap.fill(Path(topRect), with: .color(.black.opacity(0.5 * eased * 2)))
-                }
-            } else {
-                // Second half: new bottom half swinging down into place.
-                let scale = eased * 2 - 1
-                layer.drawLayer { flap in
-                    flap.translateBy(x: 0, y: rect.midY)
-                    flap.scaleBy(x: 1, y: scale)
-                    flap.translateBy(x: 0, y: -rect.midY)
-                    flap.clip(to: Path(bottomRect))
-                    flap.fill(Path(bottomRect), with: .color(Color(.sRGB, white: 0.08, opacity: 1.0)))
-                    flap.draw(newGlyph, at: center)
-                    // Brighten from edge-on to fully lit.
-                    flap.fill(Path(bottomRect), with: .color(.black.opacity(0.5 * (1 - scale))))
-                }
-            }
-
-            drawSplitLine(in: &layer, rect: rect)
+        // The moving flap, hinged at the split line.
+        if eased < 0.5 {
+            // First half: old top half falling toward the viewer.
+            let scale = 1 - eased * 2
+            var flap = tile
+            flap.translateBy(x: 0, y: rect.midY)
+            flap.scaleBy(x: 1, y: scale)
+            flap.translateBy(x: 0, y: -rect.midY)
+            flap.clip(to: Path(topRect))
+            flap.fill(Path(topRect), with: .color(Color(.sRGB, white: 0.11, opacity: 1.0)))
+            flap.draw(oldGlyph, at: center)
+            // Darken as the flap tilts toward edge-on.
+            flap.fill(Path(topRect), with: .color(.black.opacity(0.5 * eased * 2)))
+        } else {
+            // Second half: new bottom half swinging down into place.
+            let scale = eased * 2 - 1
+            var flap = tile
+            flap.translateBy(x: 0, y: rect.midY)
+            flap.scaleBy(x: 1, y: scale)
+            flap.translateBy(x: 0, y: -rect.midY)
+            flap.clip(to: Path(bottomRect))
+            flap.fill(Path(bottomRect), with: .color(Color(.sRGB, white: 0.08, opacity: 1.0)))
+            flap.draw(newGlyph, at: center)
+            // Brighten from edge-on to fully lit.
+            flap.fill(Path(bottomRect), with: .color(.black.opacity(0.5 * (1 - scale))))
         }
+
+        drawSplitLine(in: &tile, rect: rect)
     }
 
     /// Tile background: slightly lighter top half over darker bottom half.
