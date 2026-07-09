@@ -121,7 +121,8 @@ struct BoardView: View {
         .onAppear {
             initializeBoard()
         }
-        .onChange(of: message) { _, _ in
+        .onChange(of: message) { _, newValue in
+            debugLog("[BOARD] onChange fired: \"\(newValue.prefix(40))\"")
             startAnimation()
         }
     }
@@ -308,12 +309,18 @@ struct BoardView: View {
     /// Main animation loop - ticks all tiles toward their targets.
     @MainActor
     private func runAnimationLoop() async {
+        let loopStart = Date()
         let target = targetBoard
 
         // Ensure board dimensions match
-        guard currentBoard.count == target.count else { return }
+        guard currentBoard.count == target.count else {
+            debugLog("[ANIM] ABORT: board \(currentBoard.count) rows vs target \(target.count) — update dropped!")
+            return
+        }
 
+        debugLog("[ANIM] loop starting for \"\(message.prefix(40))\"")
         isFlipping = true
+        var tickCount = 0
 
         while !Task.isCancelled {
             var changedCount = 0
@@ -346,11 +353,18 @@ struct BoardView: View {
             currentBoard = newBoard
             tickDate = Date()
 
+            tickCount += 1
+            if tickCount == 1 {
+                debugLog("[ANIM] first tick committed (\(debugMs(from: loopStart)) after loop start, \(changedCount) tiles)")
+            }
+
             // Play clacks whose density matches the number of active tiles
             FlipSoundPlayer.shared.playClick(activeTiles: changedCount)
 
             try? await Task.sleep(nanoseconds: UInt64(Self.tickInterval * 1_000_000_000))
         }
+
+        debugLog("[ANIM] loop \(Task.isCancelled ? "cancelled" : "settled") after \(tickCount) ticks in \(debugMs(from: loopStart))")
 
         // Let the last flaps land, then pause the TimelineView.
         try? await Task.sleep(
@@ -358,6 +372,7 @@ struct BoardView: View {
         )
         if !Task.isCancelled {
             isFlipping = false
+            debugLog("[ANIM] isFlipping=false — TimelineView paused")
         }
     }
 }

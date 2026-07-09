@@ -9,12 +9,7 @@ import FirebaseFirestore
 /// - Publishes RoomState when the document changes.
 /// - Proactively refreshes auth token before expiry.
 /// - Health checks to detect connection failures and auto-reconnect.
-/// Print only in DEBUG builds.
-private func debugLog(_ message: @autoclosure () -> String) {
-    #if DEBUG
-    print(message())
-    #endif
-}
+/// Debug logging lives in DebugLog.swift (timestamped, DEBUG builds only).
 
 final class RoomViewModel: ObservableObject {
     @Published var state: RoomState?
@@ -119,8 +114,24 @@ final class RoomViewModel: ObservableObject {
 
         listener = db.collection("rooms").document(roomId)
             .addSnapshotListener { [weak self] snapshot, error in
+                // Timestamp on Firestore's callback queue, BEFORE hopping to
+                // main: a gap between this line and the "main hop" line below
+                // means the main thread was busy, not the network.
+                let receivedAt = Date()
+                if let snapshot = snapshot {
+                    let meta = snapshot.metadata
+                    let text = (snapshot.data()?["text"] as? String) ?? "<no text>"
+                    debugLog("[SNAPSHOT] received (fromCache=\(meta.isFromCache), pendingWrites=\(meta.hasPendingWrites)) text=\"\(text.prefix(40))\"")
+                    if let ts = snapshot.data()?["updatedAt"] as? Timestamp {
+                        debugLog("[SNAPSHOT] server updatedAt age: \(debugMs(from: ts.dateValue())) (server write -> device receipt, incl. clock skew)")
+                    }
+                } else if let error = error {
+                    debugLog("[SNAPSHOT] received error: \(error.localizedDescription)")
+                }
+
                 DispatchQueue.main.async {
                     guard let self = self else { return }
+                    debugLog("[SNAPSHOT] main-thread hop took \(debugMs(from: receivedAt))")
 
                     if let error = error {
                         debugLog("[ERROR] Snapshot listener error: \(error.localizedDescription)")
@@ -158,6 +169,7 @@ final class RoomViewModel: ObservableObject {
                     }
 
                     self.state = RoomState(text: text, source: source, updatedAt: updatedAt)
+                    debugLog("[STATE] published to UI: \"\(text.prefix(40))\" (\(debugMs(from: receivedAt)) after receipt)")
                 }
             }
     }
