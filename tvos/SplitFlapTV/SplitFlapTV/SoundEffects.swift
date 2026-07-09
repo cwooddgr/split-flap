@@ -1,189 +1,112 @@
 import Foundation
 import AVFoundation
 
-/// Procedural split-flap click sound generator using AVAudioEngine.
+/// Split-flap clack player backed by recordings of a real split-flap display.
 ///
-/// Pre-generates several audio buffers at init time, each containing a different
-/// number of overlaid clicks to simulate the sound of varying numbers of tiles
-/// flipping simultaneously. At runtime, the animation loop passes the count of
-/// tiles that changed and we pick the matching buffer — still just one
-/// `scheduleBuffer` call per tick, so the A8 stays happy.
+/// Loads a set of short clack samples (extracted from a CC0 recording of a
+/// mechanical split-flap board, Freesound #261244) at init. Each animation
+/// tick, the coordinator reports how many tiles flipped and we schedule a few
+/// randomly chosen samples with randomized gain and timing jitter within the
+/// tick. The randomization is what keeps a 60 ms tick cadence sounding like a
+/// mechanical clatter instead of a periodic hum.
 final class FlipSoundPlayer {
     static let shared = FlipSoundPlayer()
 
-    private let engine = AVAudioEngine()
-    private let player = AVAudioPlayerNode()
-    private var outputFormat: AVAudioFormat?
-    private var lastPlayTime: TimeInterval = 0
+    /// Length of one animation tick — clack jitter is spread across this window.
+    private static let tickDuration = 0.06
 
-    // Pre-generated buffers for different tile-count tiers.
-    private var singleBuffer: AVAudioPCMBuffer?   // 1 tile
-    private var fewBuffer: AVAudioPCMBuffer?       // 2–10 tiles
-    private var manyBuffer: AVAudioPCMBuffer?      // 11–50 tiles
-    private var crowdBuffer: AVAudioPCMBuffer?     // 51+ tiles
+    private let engine = AVAudioEngine()
+
+    /// Pool of player nodes used round-robin so overlapping clacks can play
+    /// simultaneously (a single AVAudioPlayerNode plays buffers sequentially).
+    private var players: [AVAudioPlayerNode] = []
+    private var nextPlayer = 0
+
+    private var clackBuffers: [AVAudioPCMBuffer] = []
 
     private init() {
+        loadBuffers()
         setupEngine()
-        createBuffers()
+    }
+
+    private func loadBuffers() {
+        for i in 0..<12 {
+            let name = String(format: "clack_%02d", i)
+            guard let url = Bundle.main.url(forResource: name, withExtension: "caf") else {
+                print("FlipSoundPlayer: missing sample \(name).caf")
+                continue
+            }
+            do {
+                let file = try AVAudioFile(forReading: url)
+                guard let buffer = AVAudioPCMBuffer(
+                    pcmFormat: file.processingFormat,
+                    frameCapacity: AVAudioFrameCount(file.length)
+                ) else { continue }
+                try file.read(into: buffer)
+                clackBuffers.append(buffer)
+            } catch {
+                print("FlipSoundPlayer: failed to load \(name).caf: \(error)")
+            }
+        }
     }
 
     private func setupEngine() {
-        let mainMixer = engine.mainMixerNode
-        engine.attach(player)
-        let format = mainMixer.outputFormat(forBus: 0)
-        engine.connect(player, to: mainMixer, format: format)
-        outputFormat = format
+        guard let format = clackBuffers.first?.format else {
+            print("FlipSoundPlayer: no samples loaded, sound disabled")
+            return
+        }
+
+        // 8 players: at most 5 clacks per tick, so a node is reused no sooner
+        // than ~96 ms later — past the end of its previous 80 ms buffer.
+        for _ in 0..<8 {
+            let player = AVAudioPlayerNode()
+            engine.attach(player)
+            engine.connect(player, to: engine.mainMixerNode, format: format)
+            players.append(player)
+        }
 
         do {
             try engine.start()
+            for player in players {
+                player.play()
+            }
         } catch {
             print("FlipSoundPlayer: failed to start AVAudioEngine: \(error)")
         }
     }
 
-    // MARK: - Buffer generation
-
-    /// A single mechanical clack: noise burst (the snap) + low-freq thump
-    /// (the mechanism body resonating). Varying offset/decay/pitch across
-    /// overlaid clacks simulates many independent physical flaps.
-    private struct Clack {
-        let offset: Double      // seconds from buffer start
-        let amplitude: Float    // overall volume 0…1
-        let noiseDecay: Double  // noise burst envelope (shorter = sharper snap)
-        let thumpFreq: Double   // low resonance frequency Hz
-        let thumpDecay: Double  // resonance ring-out time
-    }
-
-    private func createBuffers() {
-        guard let format = outputFormat else { return }
-        let sampleRate = format.sampleRate
-        let channels = Int(format.channelCount)
-        // Buffer length — generous to allow wide time spread for crowd tier.
-        let bufferDuration: Double = 0.08 // 80 ms
-        let frameCount = Int(sampleRate * bufferDuration)
-
-        // 1 tile — single sharp clack
-        singleBuffer = makeBuffer(format: format, frameCount: frameCount,
-                                  channels: channels, sampleRate: sampleRate, clacks: [
-            Clack(offset: 0.000, amplitude: 0.50, noiseDecay: 0.002, thumpFreq: 300, thumpDecay: 0.006),
-        ])
-
-        // 2–10 tiles — a few clacks staggered in time
-        fewBuffer = makeBuffer(format: format, frameCount: frameCount,
-                               channels: channels, sampleRate: sampleRate, clacks: [
-            Clack(offset: 0.000, amplitude: 0.40, noiseDecay: 0.002, thumpFreq: 280, thumpDecay: 0.006),
-            Clack(offset: 0.009, amplitude: 0.35, noiseDecay: 0.0018, thumpFreq: 350, thumpDecay: 0.005),
-            Clack(offset: 0.020, amplitude: 0.30, noiseDecay: 0.002, thumpFreq: 260, thumpDecay: 0.006),
-            Clack(offset: 0.032, amplitude: 0.25, noiseDecay: 0.0022, thumpFreq: 320, thumpDecay: 0.005),
-        ])
-
-        // 11–50 tiles — busy mechanical rattling
-        manyBuffer = makeBuffer(format: format, frameCount: frameCount,
-                                channels: channels, sampleRate: sampleRate, clacks: [
-            Clack(offset: 0.000, amplitude: 0.35, noiseDecay: 0.0025, thumpFreq: 250, thumpDecay: 0.007),
-            Clack(offset: 0.003, amplitude: 0.30, noiseDecay: 0.0018, thumpFreq: 380, thumpDecay: 0.005),
-            Clack(offset: 0.007, amplitude: 0.35, noiseDecay: 0.002, thumpFreq: 270, thumpDecay: 0.006),
-            Clack(offset: 0.012, amplitude: 0.28, noiseDecay: 0.0015, thumpFreq: 400, thumpDecay: 0.005),
-            Clack(offset: 0.018, amplitude: 0.32, noiseDecay: 0.002, thumpFreq: 240, thumpDecay: 0.007),
-            Clack(offset: 0.024, amplitude: 0.28, noiseDecay: 0.0018, thumpFreq: 360, thumpDecay: 0.005),
-            Clack(offset: 0.032, amplitude: 0.30, noiseDecay: 0.002, thumpFreq: 300, thumpDecay: 0.006),
-            Clack(offset: 0.040, amplitude: 0.25, noiseDecay: 0.0022, thumpFreq: 340, thumpDecay: 0.005),
-        ])
-
-        // 51+ tiles — full mechanical cacophony
-        crowdBuffer = makeBuffer(format: format, frameCount: frameCount,
-                                 channels: channels, sampleRate: sampleRate, clacks: [
-            Clack(offset: 0.000, amplitude: 0.32, noiseDecay: 0.003, thumpFreq: 230, thumpDecay: 0.008),
-            Clack(offset: 0.002, amplitude: 0.28, noiseDecay: 0.002, thumpFreq: 400, thumpDecay: 0.005),
-            Clack(offset: 0.005, amplitude: 0.32, noiseDecay: 0.0025, thumpFreq: 260, thumpDecay: 0.007),
-            Clack(offset: 0.008, amplitude: 0.26, noiseDecay: 0.0018, thumpFreq: 420, thumpDecay: 0.005),
-            Clack(offset: 0.011, amplitude: 0.30, noiseDecay: 0.003, thumpFreq: 240, thumpDecay: 0.007),
-            Clack(offset: 0.015, amplitude: 0.26, noiseDecay: 0.002, thumpFreq: 370, thumpDecay: 0.005),
-            Clack(offset: 0.019, amplitude: 0.32, noiseDecay: 0.0025, thumpFreq: 280, thumpDecay: 0.007),
-            Clack(offset: 0.023, amplitude: 0.26, noiseDecay: 0.0018, thumpFreq: 390, thumpDecay: 0.005),
-            Clack(offset: 0.028, amplitude: 0.30, noiseDecay: 0.002, thumpFreq: 250, thumpDecay: 0.007),
-            Clack(offset: 0.033, amplitude: 0.24, noiseDecay: 0.0022, thumpFreq: 360, thumpDecay: 0.005),
-            Clack(offset: 0.039, amplitude: 0.28, noiseDecay: 0.0025, thumpFreq: 290, thumpDecay: 0.006),
-            Clack(offset: 0.045, amplitude: 0.22, noiseDecay: 0.002, thumpFreq: 410, thumpDecay: 0.005),
-            Clack(offset: 0.052, amplitude: 0.26, noiseDecay: 0.003, thumpFreq: 270, thumpDecay: 0.006),
-        ])
-    }
-
-    /// Build a PCM buffer by overlaying multiple mechanical clacks.
-    /// Each clack is: a sharp noise burst (the snap of the flap) mixed with
-    /// a low-frequency damped sine (the body/mechanism thump).
-    private func makeBuffer(
-        format: AVAudioFormat,
-        frameCount: Int,
-        channels: Int,
-        sampleRate: Double,
-        clacks: [Clack]
-    ) -> AVAudioPCMBuffer? {
-        guard let buffer = AVAudioPCMBuffer(
-            pcmFormat: format,
-            frameCapacity: AVAudioFrameCount(frameCount)
-        ) else { return nil }
-
-        buffer.frameLength = AVAudioFrameCount(frameCount)
-        guard let channelData = buffer.floatChannelData else { return nil }
-
-        // Zero out all channels
-        for ch in 0..<channels {
-            memset(channelData[ch], 0, frameCount * MemoryLayout<Float>.size)
-        }
-
-        // Each clack lasts ~25 ms (noise dies fast, thump rings a bit longer)
-        let clackSamples = Int(sampleRate * 0.025)
-
-        for clack in clacks {
-            let startFrame = Int(clack.offset * sampleRate)
-            for i in 0..<clackSamples {
-                let idx = startFrame + i
-                guard idx < frameCount else { break }
-                let t = Double(i) / sampleRate
-
-                // Noise burst — broadband snap of the flap hitting the stop
-                let noise = Float.random(in: -1...1) * Float(exp(-t / clack.noiseDecay))
-
-                // Low-freq thump — mechanism body resonance
-                let thump = Float(sin(2.0 * .pi * clack.thumpFreq * t) * exp(-t / clack.thumpDecay))
-
-                // Mix: noise-dominant for that mechanical character
-                let sample = (noise * 0.65 + thump * 0.35) * clack.amplitude
-
-                for ch in 0..<channels {
-                    channelData[ch][idx] += sample
-                }
-            }
-        }
-
-        return buffer
-    }
-
     // MARK: - Playback
 
-    /// Play a click whose density matches the number of actively flipping tiles.
+    /// Play clacks for one animation tick with `activeTiles` tiles flipping.
+    /// A real board at full tilt reads as a texture, not one sound per tile:
+    /// density maps to roughly one audible clack per 6 active tiles.
     func playClick(activeTiles: Int = 1) {
-        if activeTiles == 0 { return }
+        guard activeTiles > 0, !clackBuffers.isEmpty, engine.isRunning else { return }
 
-        let buf: AVAudioPCMBuffer?
-        switch activeTiles {
-        case 1:      buf = singleBuffer
-        case 2...10: buf = fewBuffer
-        case 11...50: buf = manyBuffer
-        default:      buf = crowdBuffer
-        }
+        let raw = Double(activeTiles) / 6.0 + Double.random(in: -0.75...0.75)
+        let clackCount = min(max(Int(raw.rounded()), 1), 5)
 
-        guard let buf else { return }
+        for _ in 0..<clackCount {
+            let buffer = clackBuffers.randomElement()!
+            let player = players[nextPlayer]
+            nextPlayer = (nextPlayer + 1) % players.count
 
-        // Throttle: at most one buffer per 50 ms
-        let now = CACurrentMediaTime()
-        if now - lastPlayTime < 0.05 { return }
-        lastPlayTime = now
+            player.volume = Float.random(in: 0.35...0.7)
 
-        player.scheduleBuffer(buf, at: nil, options: .interrupts, completionHandler: nil)
-        if !player.isPlaying {
-            player.play()
+            // Land at a random point within the tick so no two ticks pulse
+            // at the same phase.
+            let jitter = Double.random(in: 0..<Self.tickDuration)
+            var when: AVAudioTime?
+            if let nodeTime = player.lastRenderTime,
+               let playerTime = player.playerTime(forNodeTime: nodeTime) {
+                let offset = AVAudioFramePosition(jitter * playerTime.sampleRate)
+                when = AVAudioTime(
+                    sampleTime: playerTime.sampleTime + offset,
+                    atRate: playerTime.sampleRate
+                )
+            }
+
+            player.scheduleBuffer(buffer, at: when, options: [], completionHandler: nil)
         }
     }
 }
