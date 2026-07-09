@@ -24,6 +24,12 @@ private func advanceChar(_ current: Character, toward target: Character) -> Char
         return target
     }
 
+    // Unreachable target (not in CHARSET): snap rather than cycle forever.
+    // Targets are sanitized in targetBoard, so this is a safety net.
+    guard CHARSET_INDEX[target] != nil else {
+        return target
+    }
+
     let nextIndex = (currentIndex + 1) % CHARSET.count
     return CHARSET[nextIndex]
 }
@@ -87,10 +93,14 @@ struct BoardView: View {
     /// Max per-tile start delay within a tick, so tiles don't move in lockstep.
     private static let maxStagger: TimeInterval = 0.018
 
-    /// Computed target board from the message.
+    /// Computed target board from the message. Characters the board has no
+    /// flap for become spaces (matching the web display in splitflap.js) —
+    /// an out-of-CHARSET target would otherwise make its tile cycle forever.
     private var targetBoard: [[Character]] {
         let rows = BoardLayout.layout(message: message, config: config)
-        return rows.map { Array($0) }
+        return rows.map { row in
+            row.map { CHARSET_INDEX[$0] != nil ? $0 : " " }
+        }
     }
 
     var body: some View {
