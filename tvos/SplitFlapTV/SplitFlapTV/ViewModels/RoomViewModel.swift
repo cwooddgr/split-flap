@@ -131,7 +131,8 @@ final class RoomViewModel: ObservableObject {
 
                 DispatchQueue.main.async {
                     guard let self = self else { return }
-                    debugLog("[SNAPSHOT] main-thread hop took \(debugMs(from: receivedAt))")
+                    let hopMs = Int(Date().timeIntervalSince(receivedAt) * 1000)
+                    debugLog("[SNAPSHOT] main-thread hop took \(hopMs)ms")
 
                     if let error = error {
                         debugLog("[ERROR] Snapshot listener error: \(error.localizedDescription)")
@@ -170,6 +171,24 @@ final class RoomViewModel: ObservableObject {
 
                     self.state = RoomState(text: text, source: source, updatedAt: updatedAt)
                     debugLog("[STATE] published to UI: \"\(text.prefix(40))\" (\(debugMs(from: receivedAt)) after receipt)")
+
+                    #if DEBUG
+                    // Feed the auto-test driver. serverAgeMs is measured at
+                    // callback receipt, same as the [SNAPSHOT] age log line.
+                    let serverAgeMs = updatedAt.map {
+                        Int(receivedAt.timeIntervalSince($0) * 1000)
+                    } ?? -1
+                    NotificationCenter.default.post(
+                        name: .ffPublished, object: nil,
+                        userInfo: [
+                            "text": text,
+                            "serverAgeMs": serverAgeMs,
+                            "hopMs": hopMs,
+                            "receivedAt": receivedAt,
+                            "pendingWrites": snapshot?.metadata.hasPendingWrites ?? false,
+                        ]
+                    )
+                    #endif
                 }
             }
     }

@@ -16,6 +16,7 @@ final class MainThreadWatchdog {
     private var lastPong = Date()
     private var stallStart: Date?
     private var started = false
+    private var stalls: [[String: Any]] = []
 
     /// Gap beyond which the main thread is considered stalled.
     private let stallThreshold: TimeInterval = 1.0
@@ -61,8 +62,33 @@ final class MainThreadWatchdog {
             debugLog("[WATCHDOG] main thread recovered — stall lasted \(debugMs(from: began))")
             lock.lock()
             stallStart = nil
+            stalls.append([
+                "startedAt": Self.stampFormatter.string(from: began),
+                "ms": Int(Date().timeIntervalSince(began) * 1000),
+            ])
             lock.unlock()
         }
     }
+
+    /// Completed stalls so far, JSON-safe, for the auto-test metrics report.
+    func stallLog() -> [[String: Any]] {
+        lock.lock()
+        defer { lock.unlock() }
+        var log = stalls
+        if let ongoing = stallStart {
+            log.append([
+                "startedAt": Self.stampFormatter.string(from: ongoing),
+                "ms": Int(Date().timeIntervalSince(ongoing) * 1000),
+                "ongoing": true,
+            ])
+        }
+        return log
+    }
+
+    private static let stampFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm:ss.SSS"
+        return f
+    }()
 }
 #endif

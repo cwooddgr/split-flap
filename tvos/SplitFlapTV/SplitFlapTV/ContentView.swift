@@ -6,6 +6,11 @@ struct ContentView: View {
     /// Random room id generated once per app launch, mirroring the web display.
     /// Uses 6–8 characters from A–Z0–9, just like `generateRoomId` in display.js.
     private static let initialRoomId: String = {
+        #if DEBUG
+        // Auto-test builds use a fixed room so the metrics doc has a known
+        // address readable from outside the device.
+        if AutoTestDriver.enabled { return AutoTestDriver.roomId }
+        #endif
         let chars = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
         let length = 6 + Int.random(in: 0..<3) // 6–8 chars
         var id = ""
@@ -76,6 +81,9 @@ struct ContentView: View {
         // Keep the Apple TV from sleeping/screensaver while this view is visible.
         .onAppear {
             UIApplication.shared.isIdleTimerDisabled = true
+            #if DEBUG
+            AutoTestDriver.shared.startIfEnabled()
+            #endif
         }
         .onDisappear {
             UIApplication.shared.isIdleTimerDisabled = false

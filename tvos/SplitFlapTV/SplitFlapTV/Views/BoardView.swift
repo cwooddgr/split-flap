@@ -366,6 +366,18 @@ struct BoardView: View {
 
         debugLog("[ANIM] loop \(Task.isCancelled ? "cancelled" : "settled") after \(tickCount) ticks in \(debugMs(from: loopStart))")
 
+        #if DEBUG
+        NotificationCenter.default.post(
+            name: .ffSettled, object: nil,
+            userInfo: [
+                "message": message,
+                "ticks": tickCount,
+                "ms": Int(Date().timeIntervalSince(loopStart) * 1000),
+                "cancelled": Task.isCancelled,
+            ]
+        )
+        #endif
+
         // Let the last flaps land, then pause the TimelineView.
         try? await Task.sleep(
             nanoseconds: UInt64((Self.maxStagger + Self.flipDuration) * 1_000_000_000)
