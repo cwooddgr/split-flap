@@ -83,6 +83,13 @@ struct BoardView: View {
     /// The animation tick task - advances all tiles toward their targets.
     @State private var animationTask: Task<Void, Never>?
 
+    /// Pre-rendered top/bottom half images for every CHARSET character,
+    /// built once on appear. The Canvas draws only these cached images —
+    /// resolving 74 Text glyphs per frame was the A10X bottleneck.
+    @State private var glyphCache: [Character: TileHalves] = [:]
+
+    @Environment(\.displayScale) private var displayScale
+
     /// Seconds between coordinator ticks.
     private static let tickInterval: TimeInterval = 0.06
 
@@ -105,7 +112,11 @@ struct BoardView: View {
 
     var body: some View {
         TimelineView(.animation(paused: !isFlipping)) { timeline in
-            Canvas { context, _ in
+            // Asynchronous presentation keeps slow frames (A10X renders this
+            // text-heavy canvas in hundreds of ms) from starving the main
+            // dispatch queue — without it, Firestore delivery and every other
+            // main.async block queued behind rendering for seconds.
+            Canvas(rendersAsynchronously: true) { context, _ in
                 drawBoard(in: &context, now: timeline.date)
             }
             .frame(
@@ -119,6 +130,9 @@ struct BoardView: View {
                 .fill(Color(.sRGB, red: 0.17, green: 0.17, blue: 0.17, opacity: 1.0))
         )
         .onAppear {
+            if glyphCache.isEmpty {
+                glyphCache = Self.buildGlyphCache(scale: displayScale)
+            }
             initializeBoard()
         }
         .onChange(of: message) { _, newValue in
@@ -137,22 +151,9 @@ struct BoardView: View {
     }
 
     private func drawBoard(in context: inout GraphicsContext, now: Date) {
-        guard !currentBoard.isEmpty else { return }
+        guard !currentBoard.isEmpty, !glyphCache.isEmpty else { return }
 
         let elapsed = now.timeIntervalSince(tickDate)
-
-        // Resolve each distinct glyph once per frame, draw many times.
-        var glyphCache: [Character: GraphicsContext.ResolvedText] = [:]
-        func glyph(_ char: Character) -> GraphicsContext.ResolvedText {
-            if let cached = glyphCache[char] { return cached }
-            let resolved = context.resolve(
-                Text(String(char))
-                    .font(.system(size: Metrics.fontSize, weight: .semibold, design: .monospaced))
-                    .foregroundColor(.white)
-            )
-            glyphCache[char] = resolved
-            return resolved
-        }
 
         for row in 0..<currentBoard.count {
             for col in 0..<currentBoard[row].count {
@@ -173,12 +174,15 @@ struct BoardView: View {
                     progress = min(max((elapsed - start) / Self.flipDuration, 0), 1)
                 }
 
+                guard let currentHalves = glyphCache[current] else { continue }
+
                 if progress >= 1 {
-                    drawStaticTile(in: &context, rect: rect, glyph: glyph(current))
+                    drawStaticTile(in: &context, rect: rect, halves: currentHalves)
                 } else {
                     drawFlippingTile(
                         in: &context, rect: rect,
-                        oldGlyph: glyph(previous), newGlyph: glyph(current),
+                        old: glyphCache[previous] ?? currentHalves,
+                        new: currentHalves,
                         progress: progress
                     )
                 }
@@ -186,23 +190,17 @@ struct BoardView: View {
         }
     }
 
-    /// Tile at rest: background halves, character, split line.
-    ///
-    /// Copied `GraphicsContext` values share the canvas but carry their own
-    /// clip/transform state — unlike `drawLayer`, they don't allocate a
-    /// transparency layer. With 168 tiles per frame at 4K, per-tile layers
-    /// starved the main thread for seconds on A10X hardware (Apple TV 4K
-    /// 1st gen), so no `drawLayer` anywhere in the draw path.
+    /// Tile at rest: two cached half images, nothing else. Backgrounds,
+    /// rounded corners, glyph, and split line are all baked into the images.
     private func drawStaticTile(
         in context: inout GraphicsContext,
         rect: CGRect,
-        glyph: GraphicsContext.ResolvedText
+        halves: TileHalves
     ) {
-        var tile = context
-        tile.clip(to: Path(roundedRect: rect, cornerRadius: Metrics.cornerRadius))
-        fillHalves(in: &tile, rect: rect)
-        tile.draw(glyph, at: CGPoint(x: rect.midX, y: rect.midY))
-        drawSplitLine(in: &tile, rect: rect)
+        context.draw(halves.top, in: CGRect(
+            x: rect.minX, y: rect.minY, width: rect.width, height: rect.height / 2))
+        context.draw(halves.bottom, in: CGRect(
+            x: rect.minX, y: rect.midY, width: rect.width, height: rect.height / 2))
     }
 
     /// Tile mid-flip: new top half revealed behind a falling flap that carries
@@ -212,77 +210,101 @@ struct BoardView: View {
     private func drawFlippingTile(
         in context: inout GraphicsContext,
         rect: CGRect,
-        oldGlyph: GraphicsContext.ResolvedText,
-        newGlyph: GraphicsContext.ResolvedText,
+        old: TileHalves,
+        new: TileHalves,
         progress: Double
     ) {
         let eased = progress * progress
-        let center = CGPoint(x: rect.midX, y: rect.midY)
         let topRect = CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height / 2)
         let bottomRect = CGRect(x: rect.minX, y: rect.midY, width: rect.width, height: rect.height / 2)
 
-        // Same copied-context technique as drawStaticTile — clip and
-        // transform state without drawLayer's per-tile transparency layers.
-        var tile = context
-        tile.clip(to: Path(roundedRect: rect, cornerRadius: Metrics.cornerRadius))
-
         // Static layers behind the flap: new character's top half,
         // old character's bottom half.
-        fillHalves(in: &tile, rect: rect)
-        var top = tile
-        top.clip(to: Path(topRect))
-        top.draw(newGlyph, at: center)
-        var bottom = tile
-        bottom.clip(to: Path(bottomRect))
-        bottom.draw(oldGlyph, at: center)
+        context.draw(new.top, in: topRect)
+        context.draw(old.bottom, in: bottomRect)
 
-        // The moving flap, hinged at the split line.
+        // The moving flap, hinged at the split line. A copied context carries
+        // the transform without allocating a transparency layer.
         if eased < 0.5 {
             // First half: old top half falling toward the viewer.
             let scale = 1 - eased * 2
-            var flap = tile
+            var flap = context
             flap.translateBy(x: 0, y: rect.midY)
             flap.scaleBy(x: 1, y: scale)
             flap.translateBy(x: 0, y: -rect.midY)
-            flap.clip(to: Path(topRect))
-            flap.fill(Path(topRect), with: .color(Color(.sRGB, white: 0.11, opacity: 1.0)))
-            flap.draw(oldGlyph, at: center)
+            flap.draw(old.top, in: topRect)
             // Darken as the flap tilts toward edge-on.
             flap.fill(Path(topRect), with: .color(.black.opacity(0.5 * eased * 2)))
         } else {
             // Second half: new bottom half swinging down into place.
             let scale = eased * 2 - 1
-            var flap = tile
+            var flap = context
             flap.translateBy(x: 0, y: rect.midY)
             flap.scaleBy(x: 1, y: scale)
             flap.translateBy(x: 0, y: -rect.midY)
-            flap.clip(to: Path(bottomRect))
-            flap.fill(Path(bottomRect), with: .color(Color(.sRGB, white: 0.08, opacity: 1.0)))
-            flap.draw(newGlyph, at: center)
+            flap.draw(new.bottom, in: bottomRect)
             // Brighten from edge-on to fully lit.
             flap.fill(Path(bottomRect), with: .color(.black.opacity(0.5 * (1 - scale))))
         }
-
-        drawSplitLine(in: &tile, rect: rect)
     }
 
-    /// Tile background: slightly lighter top half over darker bottom half.
-    private func fillHalves(in layer: inout GraphicsContext, rect: CGRect) {
-        layer.fill(
-            Path(CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height / 2)),
-            with: .color(Color(.sRGB, white: 0.11, opacity: 1.0))
-        )
-        layer.fill(
-            Path(CGRect(x: rect.minX, y: rect.midY, width: rect.width, height: rect.height / 2)),
-            with: .color(Color(.sRGB, white: 0.08, opacity: 1.0))
-        )
+    // MARK: - Glyph cache
+
+    struct TileHalves {
+        let top: Image
+        let bottom: Image
     }
 
-    private func drawSplitLine(in layer: inout GraphicsContext, rect: CGRect) {
-        layer.fill(
-            Path(CGRect(x: rect.minX, y: rect.midY - 1, width: rect.width, height: 2)),
-            with: .color(Color(.sRGB, white: 0.02, opacity: 1.0))
-        )
+    /// The full tile exactly as the canvas used to draw it — background
+    /// halves, centered glyph, split line, rounded corners — rendered once
+    /// per character and split into halves.
+    private struct TileGlyphView: View {
+        let char: Character
+
+        var body: some View {
+            ZStack {
+                VStack(spacing: 0) {
+                    Color(.sRGB, white: 0.11, opacity: 1.0)
+                    Color(.sRGB, white: 0.08, opacity: 1.0)
+                }
+                Text(String(char))
+                    .font(.system(size: Metrics.fontSize, weight: .semibold, design: .monospaced))
+                    .foregroundColor(.white)
+                Rectangle()
+                    .fill(Color(.sRGB, white: 0.02, opacity: 1.0))
+                    .frame(height: 2)
+            }
+            .frame(width: Metrics.tileWidth, height: Metrics.tileHeight)
+            .clipShape(RoundedRectangle(cornerRadius: Metrics.cornerRadius))
+        }
+    }
+
+    @MainActor
+    private static func buildGlyphCache(scale: CGFloat) -> [Character: TileHalves] {
+        let start = Date()
+        var cache: [Character: TileHalves] = [:]
+
+        for char in CHARSET {
+            let renderer = ImageRenderer(content: TileGlyphView(char: char))
+            renderer.scale = scale
+            guard let cg = renderer.cgImage else { continue }
+
+            let halfHeight = cg.height / 2
+            guard
+                let topCG = cg.cropping(to: CGRect(
+                    x: 0, y: 0, width: cg.width, height: halfHeight)),
+                let bottomCG = cg.cropping(to: CGRect(
+                    x: 0, y: halfHeight, width: cg.width, height: cg.height - halfHeight))
+            else { continue }
+
+            cache[char] = TileHalves(
+                top: Image(decorative: topCG, scale: scale),
+                bottom: Image(decorative: bottomCG, scale: scale)
+            )
+        }
+
+        debugLog("[GLYPHS] cached \(cache.count) tile images in \(debugMs(from: start))")
+        return cache
     }
 
     // MARK: - Animation coordinator
