@@ -272,7 +272,7 @@ struct BoardView: View {
                     .foregroundColor(.white)
                 Rectangle()
                     .fill(Color(.sRGB, white: 0.02, opacity: 1.0))
-                    .frame(height: 2)
+                    .frame(height: 4)
             }
             .frame(width: Metrics.tileWidth, height: Metrics.tileHeight)
             .clipShape(RoundedRectangle(cornerRadius: Metrics.cornerRadius))
