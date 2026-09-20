@@ -13,16 +13,21 @@ Native tvOS client for the Flip Flap split-flap message board. Mirrors the web d
 SplitFlapTV/
   SplitFlapTV.xcodeproj
   SplitFlapTV/
-    SplitFlapTVApp.swift          # @main entry point
+    FlipFlapApp.swift             # @main entry point
     ContentView.swift             # Root view: room ID, QR toggle, board
-    SoundEffects.swift            # Click sound via AVAudioEngine
-    GoogleService-Info.plist      # Firebase config (not in git)
+    SoundEffects.swift            # Recorded clack samples played through AVAudioEngine
+    Sounds/                       # 12 clack samples (.caf)
+    GoogleService-Info.plist      # Firebase config (tracked in git)
+    PrivacyInfo.xcprivacy         # Privacy manifest
+    AutoTestDriver.swift          # DEBUG-only latency harness
+    MainThreadWatchdog.swift      # DEBUG-only main-thread stall detector
+    DebugLog.swift                # Logging that compiles to nothing in Release
     Models/
       RoomState.swift             # BoardConfig, RoomState
     ViewModels/
       RoomViewModel.swift         # Firestore subscription + anonymous auth
     Views/
-      BoardView.swift             # Grid + animation coordinator + TileView
+      BoardView.swift             # Canvas board, glyph cache, animation coordinator, CHARSET
       BoardLayout.swift           # Word-wrap / centering (Swift port of splitflap.js)
       QRCodeView.swift            # QR code via CoreImage
     Assets.xcassets/              # App icon, top shelf, accent color
@@ -33,14 +38,15 @@ See the repository root for the canonical protocol (`docs/PROTOCOL.md`), the web
 ## Building
 
 1. Open `SplitFlapTV/SplitFlapTV.xcodeproj` in Xcode.
-2. Ensure `GoogleService-Info.plist` is present in the `SplitFlapTV` target (download from the Firebase console for the `co.dgrlabs.flipflap` app if missing).
-3. Firebase dependencies are managed via Swift Package Manager — Xcode resolves them automatically on first build.
+2. `GoogleService-Info.plist` is tracked in this repo and points at our Firebase project. If you are building your own copy, replace it with the plist for your own Firebase app.
+3. Firebase dependencies are managed via Swift Package Manager, and Xcode resolves them automatically on first build.
 4. Select a tvOS 17+ simulator or Apple TV device and Build & Run (⌘R).
 
 ## Architecture notes
 
-- **Animation coordinator**: a single `Task` advances all tiles one step per ~50ms tick, with one batched `currentBoard` state update per tick. Per-tile async tasks were too slow on A8 hardware (see commit `afed3f3`).
-- **Layout**: 21 columns × 8 rows (web uses 21 × 6). Both platforms share the same word-wrap + centering algorithm and 74-character `CHARSET`.
+- **Animation coordinator**: a single `Task` advances all tiles one step per 60 ms tick, with one batched state update per tick. Per-tile async tasks were too slow on A8 hardware (see commits `affa884` and `f76b6c6`).
+- **Rendering**: the whole board is one `Canvas` in a `TimelineView`, drawing pre-rendered glyph half-images from a cache. Drawing text every frame took 20 seconds or more to settle a full board on an A10X; the cached images brought that to about 4.5 seconds (commit `1014b5b`).
+- **Layout**: 21 columns × 8 rows (web uses 21 × 6). Both platforms share the same word-wrap + centering algorithm and 73-character `CHARSET`.
 - **Connection resilience**: the app forces a fresh anonymous auth on wake and uses listener teardown/rebuild on reconnect rather than `enableNetwork`.
 
 ## Screenshots

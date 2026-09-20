@@ -16,11 +16,11 @@ The display shows a grid of animated split‑flap cells; a separate “remote”
   - Scanning the QR code opens the remote page already bound to that room.
 - **Animated board**: Characters animate in a split‑flap style as the text changes.
 - **Fun presets**:
-  - “Random Quote” button with humorous sayings.
-  - "Funny Quote" button with humorous one-liners.
+  - “Random Quote” button that picks a quote from `quotes.json`.
+  - "Funny Quote" button with humorous one-liners. Within 30 days of a holiday it offers quotes for that holiday.
 - **Automatic cleanup**:
   - Each room document stores an `expiresAt` field.
-  - You can configure Firestore TTL to delete rooms after they are stale (e.g., 7 days).
+  - A Firestore TTL policy on that field deletes a room 7 days after its last message (deletion can lag by about a day).
 - **tvOS app**:
   - Mirrors the web display behavior on Apple TV.
   - Connects to the same Firebase project and room documents.
@@ -43,13 +43,13 @@ The display shows a grid of animated split‑flap cells; a separate “remote”
 - **tvOS app** (current version: **1.1**, build 2)
   - `tvos/README.md` – tvOS‑specific notes.
   - `tvos/SplitFlapTV/` – SwiftUI tvOS project.
-    - `SplitFlapTVApp.swift` – App entry point.
+    - `FlipFlapApp.swift` – App entry point.
     - `ContentView.swift` – Top‑level UI.
     - `Models/RoomState.swift` – Board/room data model.
     - `ViewModels/RoomViewModel.swift` – Binds Firestore state to the views.
     - `Views/BoardLayout.swift`, `BoardView.swift`, `QRCodeView.swift` – Main views.
     - `SoundEffects.swift` – Optional split‑flap sound effects.
-    - `GoogleService-Info.plist` – Firebase config for tvOS (you provide your own).
+    - `GoogleService-Info.plist` – Firebase config for tvOS. The tracked file points at our project, so swap in your own if you fork.
 
 ---
 
@@ -132,7 +132,7 @@ firebase deploy --only firestore:rules
 
 You can also paste the file's contents into Firebase Console → Firestore → Rules.
 
-**Important:** Use `allow read` (not separate `allow get`/`allow list`) to ensure real-time listeners work correctly.
+The rules currently grant `read`, which covers both `get` and `list`. A listener on a single document should only need `get`, and we plan to narrow the rule once we have tested that.
 
 ---
 
@@ -159,8 +159,11 @@ If you add HTTP referrer restrictions to your API key, ensure your domain is inc
    - Add `*.yourdomain.com/*` (for subdomains)
    - Add `localhost/*` for local development
 4. Under **API restrictions**, ensure these APIs are allowed:
-   - Cloud Firestore API
-   - Identity Toolkit API
+   - Cloud Firestore API (`firestore.googleapis.com`)
+   - Identity Toolkit API (`identitytoolkit.googleapis.com`)
+   - Token Service API (`securetoken.googleapis.com`)
+
+Don't leave out the Token Service API. Firebase Auth refreshes ID tokens through it, and without it every refresh returns 403, so a page stops working about an hour after it loads.
 
 Without correct referrer restrictions, Firestore real-time listeners will fail with CORS errors.
 
@@ -224,7 +227,8 @@ You should still harden it:
 - In **Google Cloud Console → APIs & Services → Credentials**, find your Firebase web API key and:
   - Set **API restrictions** to only:
     - **Cloud Firestore API**
-    - **Identity Toolkit API** / **Firebase Authentication API**
+    - **Identity Toolkit API**
+    - **Token Service API** (needed for ID token refresh)
   - Optionally set **HTTP referrer** restrictions for your production web host.
 - Rely on strong **Firestore security rules** to protect your data.
 

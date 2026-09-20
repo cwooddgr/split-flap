@@ -1,9 +1,11 @@
 # Split-Flap Protocol & Domain Model
 
-This document describes the *contract* between controllers (phones, future tvOS app) and displays
-(the web split-flap display, future tvOS display), independent of UI.
+This document describes the *contract* between controllers (the web remote on a phone) and displays
+(the web split-flap display and the tvOS app), independent of UI.
 
 It reflects the current implementation in this repo and is the reference for any future clients.
+The enforced part of the contract is `firestore.rules` at the repo root; if this page and the rules
+disagree, the rules win. Last checked against the code on 2026-09-19.
 
 ---
 
@@ -13,9 +15,10 @@ It reflects the current implementation in this repo and is the reference for any
 
 - A rectangular grid of split‑flap tiles.
 - Current configuration (as of this repo):
-  - `cols = 21`
-  - `rows = 6`
-- Each cell displays a single character from a fixed character set (defined in `splitflap.js`):
+  - Web display: `cols = 21`, `rows = 6`
+  - tvOS display: `cols = 21`, `rows = 8`
+- Each cell displays a single character from a fixed set of 73 characters (`CHARSET`, defined in
+  `splitflap.js` and again in `BoardView.swift`; the two strings are identical):
   - Space, `A–Z`, `0–9`
   - Common punctuation and a few extra glyphs (quotes, degree symbol, dashes, …)
 - Rendering rules (as implemented in `SplitFlapDisplay` in `splitflap.js`):
@@ -36,8 +39,10 @@ It reflects the current implementation in this repo and is the reference for any
 - The board logic:
   1. Splits on `\n`.
   2. Wraps each line at spaces to `cols`.
-  3. Collects the resulting lines into a list (up to `rows`).
-  4. Applies centering as described above.
+  3. Collects the resulting lines into a list (up to `rows`). Lines past `rows` are dropped, so a
+     message that fills 8 rows on tvOS loses its last lines on the 6-row web display.
+  4. Uppercases the text and replaces any character outside `CHARSET` with a space.
+  5. Applies centering as described above.
 
 Displays and controllers **do not** need to know the centering implementation details,
 but they must agree that:
@@ -67,8 +72,9 @@ Current fields:
 ```jsonc
 {
   "text": "WELCOME TO SPLIT-FLAP",
-  "source": "manual",        // optional: 'manual' | 'random' | 'christmas' | ...
-  "updatedAt": "<Timestamp>" // Firestore serverTimestamp()
+  "source": "manual",        // optional: 'manual' | 'random' | 'funny' | 'clear' | a holiday key
+  "updatedAt": "<Timestamp>", // Firestore serverTimestamp()
+  "expiresAt": "<Timestamp>"  // now + 7 days, set by the remote on every write
 }
 ```
 
@@ -81,9 +87,18 @@ Current fields:
     - `"manual"` – user typed text and pressed Display (or Cmd/Ctrl+Enter).
     - `"random"` – Random Quote button.
     - `"funny"` – Funny Quote button.
+    - `"clear"` – Clear button (writes an empty `text`).
+    - A holiday key (`"christmas"`, `"halloween"`, `"thanksgiving"`, and 11 others listed in
+      `control.js`) – the Funny Quote button within 30 days of that holiday.
+  - Displays ignore it.
 - `updatedAt` (timestamp, optional)
   - Firestore `Timestamp` set via `serverTimestamp()` in writes.
   - Used only for debugging / ordering; not required for rendering.
+- `expiresAt` (timestamp, optional in the rules, always written by the web remote)
+  - Set to the phone's clock plus 7 days on every write, so it rolls forward with each message.
+  - A Firestore TTL policy on this field deletes the document after it passes. Deletion usually
+    follows within about a day. A document written without `expiresAt` is never cleaned up.
+  - When the document is deleted under a live listener, both displays keep showing their last message.
 
 ### Example documents
 
@@ -115,7 +130,8 @@ With metadata:
 Controllers (current web remote, future tvOS remote) are responsible for:
 
 1. Obtaining a `roomId`:
-   - The web display generates a random one and encodes it in a QR URL.
+   - Each display (web and tvOS) generates a random one at launch and encodes it in a QR URL
+     pointing at `control.html`. Neither display persists it, so a reload or relaunch starts a new room.
    - Remotes read `room` from the query string or URL hash.
 2. Writing messages to `rooms/{roomId}`.
 
@@ -125,29 +141,29 @@ Canonical write shape:
 {
   "text": "YOUR MESSAGE HERE",
   "source": "manual",
-  "updatedAt": "<serverTimestamp()>"
+  "updatedAt": "<serverTimestamp()>",
+  "expiresAt": "<now + 7 days>"
 }
 ```
 
 ### Current web implementation
 
-- Uses `setDoc(roomRef, { text, updatedAt: serverTimestamp(), source }, { merge: true })`
-  in `control.js`.
+- Uses `setDoc(roomRef, { text, updatedAt: serverTimestamp(), expiresAt, source }, { merge: true })`
+  in `control.js`. This first write is what creates the room document; displays never write.
 - `roomRef` is `doc(db, "rooms", roomId)`.
-- No other fields are required; additional metadata can be added if both sides agree.
+- The rules require `text` to be a string of at most 10,000 characters. They do not check any other field today.
 
-Future controllers (e.g., tvOS) should:
+Any other controller should:
 
 - Use the same document path and shape.
 - Always write a `text` string.
-- Optionally set `source` and `updatedAt` for observability.
+- Set `expiresAt` so the room is cleaned up, and optionally `source` and `updatedAt` for observability.
 
 ---
 
-## Display / tvOS client behavior
+## Display client behavior
 
-
-Displays (current web display, future tvOS display) are responsible for:
+Displays (the web display and the tvOS app) are responsible for:
 
 1. Subscribing to `rooms/{roomId}`.
 2. Reacting to changes in `text` (and optionally `source`, `updatedAt`).
@@ -157,7 +173,7 @@ Canonical behavior:
 
 - On snapshot:
   - If the document does not exist:
-    - Show an empty board or a local default message.
+    - Show a local default message, or keep the last message if one was already showing.
   - If the document exists:
     - If `text` is a string, render it via the board.
     - Ignore unknown extra fields.
@@ -172,6 +188,12 @@ Canonical behavior:
     - If `snapshot.exists()` and `typeof data.text === "string"`,
       calls `display.setText(data.text)`.
 
+### Current tvOS implementation
+
+- `ContentView.swift` generates a random `roomId` once per launch and builds the QR URL.
+- `RoomViewModel.swift` signs in anonymously, then attaches a snapshot listener to `rooms/{roomId}`.
+- `BoardLayout.swift` is a Swift port of the layout in `splitflap.js`, used with `BoardConfig(cols: 21, rows: 8)`.
+
 No other coupling exists between the display and controller beyond the shared
 `rooms/{roomId}` document and the `text` field.
 
@@ -179,8 +201,9 @@ No other coupling exists between the display and controller beyond the shared
 
 ## Canonical TypeScript shapes
 
-The `shared/protocol.ts` file contains convenience interfaces that mirror this
-document. They are **non‑authoritative** but useful for type-checking and IDEs.
+The `shared/protocol.ts` file contains convenience interfaces that roughly mirror this
+document. They are **non‑authoritative**: nothing imports the file, and it predates `expiresAt`
+and the 8-row tvOS board.
 
 ```ts
 export interface BoardConfig {
@@ -202,7 +225,6 @@ export interface RoomState {
 }
 ```
 
-Future clients (e.g., tvOS) should define equivalent models in their own
-languages (Swift structs, etc.) that match these fields and types.
+The tvOS app defines its equivalents in `Models/RoomState.swift`.
 
 

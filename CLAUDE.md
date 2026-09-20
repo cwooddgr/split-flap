@@ -28,7 +28,7 @@ Current version: **1.1** (build 2), live on the App Store since 2026-07-10 (App 
 
 ```bash
 open tvos/SplitFlapTV/SplitFlapTV.xcodeproj
-# Requires GoogleService-Info.plist from Firebase console
+# GoogleService-Info.plist is tracked in the repo; nothing to download
 # Build and run (Cmd+R) on tvOS simulator or Apple TV device
 ```
 
@@ -69,15 +69,16 @@ Firebase SDK is managed via Swift Package Manager (configured in the Xcode proje
 ### tvOS App (`tvos/SplitFlapTV/SplitFlapTV/`)
 - `ContentView.swift` - Root view: room ID generation, QR code toggle, board container
 - `ViewModels/RoomViewModel.swift` - Firebase subscription, anonymous auth, room state
-- `Views/BoardView.swift` - Grid rendering + animation coordinator + `TileView` (all in one file)
+- `Views/BoardView.swift` - The whole board as one `Canvas` inside a `TimelineView`, drawn from a cache of pre-rendered glyph half-images, plus the animation coordinator and `CHARSET` (all in one file; there is no per-tile view since 1.1)
 - `Views/BoardLayout.swift` - Word-wrap and centering logic (Swift port of `splitflap.js`)
 - `Views/QRCodeView.swift` - QR code rendering via CoreImage
 - `Models/RoomState.swift` - `BoardConfig` and `RoomState` structs
-- `SoundEffects.swift` - Click sound via AVAudioEngine
+- `SoundEffects.swift` - `FlipSoundPlayer`: 12 recorded clack samples (`Sounds/*.caf`) through a pool of `AVAudioPlayerNode`s on one `AVAudioEngine`, with random gain and jitter per tick
+- `AutoTestDriver.swift`, `MainThreadWatchdog.swift`, `DebugLog.swift` - Latency harness and logging, all inside `#if DEBUG`. `AutoTestDriver.enabled` is a source-level flag, and when on it writes to the production Firestore project (rooms `DBGTEST1` and `DBGMETR1`)
 
 ### Protocol
 - `docs/PROTOCOL.md` - Canonical Firestore document shape and contracts
-- `shared/protocol.ts` - TypeScript interfaces (documentation only, not runtime)
+- `shared/protocol.ts` - TypeScript interfaces. Nothing imports it, there is no TypeScript build, and it is stale (no `expiresAt`, rows = 6); trust `docs/PROTOCOL.md` and `firestore.rules` over it
 
 ## Board Dimensions
 
@@ -85,22 +86,28 @@ The two platforms use different grid sizes:
 - **Web**: 21 columns × 6 rows (in `display.js`: `new SplitFlapDisplay('displayBoard', 21, 6)`)
 - **tvOS**: 21 columns × 8 rows (in `ContentView.swift`: `BoardConfig(cols: 21, rows: 8)`)
 
-Both use the same layout algorithm (word-wrap, center) and 74-character `CHARSET` constant.
+Both use the same layout algorithm (word-wrap, center) and the same 73-character `CHARSET` constant (counted in both files 2026-09-19; docs said 74 until then).
+
+A message with more lines than the board has rows loses the extra lines without warning. On web that is `lines.slice(0, this.rows)` in `splitflap.js`, so a 7-line message that fits tvOS drops its last line on web. The remote has no preview and does not know which board size it is writing to.
 
 ## Layout Algorithm
 
-Both web and tvOS implement the same layout:
+Both web and tvOS implement the same layout, as two hand ports with no shared tests:
 1. Split text on `\n` into logical lines
 2. Word-wrap each line at spaces to fit 21 columns
 3. Horizontally center based on widest line
 4. Vertically center within available rows
-5. All text is uppercased
+5. All text is uppercased, and any character outside `CHARSET` becomes a space
 
-Character set: Space, A-Z, 0-9, common punctuation, smart quotes, degree symbol, dashes (74 chars total, defined in `CHARSET` in both `splitflap.js` and `BoardView.swift`).
+Known divergence between the ports (found 2026-09-19 by running both algorithms on the same input, not yet fixed): on a line that needs wrapping, the Swift port turns each empty token from `split(" ")` into a space and then adds the joiner space too, so a double space becomes a triple space on tvOS and the wrap point can move. The JS port keeps double spaces as typed. Both ports uppercase after wrapping, so `ß` → `SS` can overflow a line and get cut.
+
+Character set: Space, A-Z, 0-9, common punctuation, smart quotes, degree symbol, dashes (73 chars total, defined in `CHARSET` in both `splitflap.js` and `BoardView.swift`).
 
 ## tvOS Animation Architecture
 
-The tvOS app uses a centralized animation coordinator (single `Task` with a timer loop) instead of per-tile async tasks. One animation tick advances all tiles one step through `CHARSET` toward their targets, with a single batched `currentBoard` state update per tick (~50ms interval). This is critical for performance on Apple TV hardware.
+The tvOS app uses a centralized animation coordinator (single `Task` with a timer loop) instead of per-tile async tasks. One animation tick advances all tiles one step through `CHARSET` toward their targets, with one batched state update per tick (`tickInterval` = 60 ms in `BoardView.swift`; each flap takes 40 ms plus up to 18 ms of per-tile stagger). The board is a single `Canvas` that draws cached glyph half-images, so no text is laid out per frame. Both decisions came out of the July 2026 performance work on the A10X and are critical on Apple TV hardware; don't undo either without new measurements.
+
+The web display has not had the same treatment. `splitflap.js` still runs one `setTimeout` chain per tile, creates and removes a DOM node per step, and synthesizes a fresh noise buffer per click.
 
 ## Firestore Document Shape
 
@@ -108,18 +115,20 @@ The tvOS app uses a centralized animation coordinator (single `Task` with a time
 // Collection: rooms, Document: {roomId}
 {
   "text": "MESSAGE HERE",           // required - raw text with \n for newlines
-  "source": "manual",               // optional - "manual" | "random" | "funny"
+  "source": "manual",               // optional - "manual" | "random" | "funny" | "clear" | a holiday key
   "updatedAt": "<serverTimestamp>", // optional - for debugging
   "expiresAt": "<timestamp>"        // optional - TTL cleanup (7 days)
 }
 ```
+
+`source` is whatever `control.js` passes to `sendText`. Near a holiday the Funny Quote button sends that holiday's key instead of `"funny"` (`newyears`, `valentines`, `stpatricks`, `easter`, `aprilfools`, `mothers`, `memorial`, `fathers`, `independence`, `labor`, `halloween`, `veterans`, `thanksgiving`, `christmas`). Displays ignore the field. Only the web remote writes in release builds; neither display ever creates or writes the room document.
 
 ## Firebase Requirements
 
 - **Cloud Firestore** enabled (Native mode)
 - **Anonymous authentication** enabled
 - **Authorized domains** configured (Firebase Console → Authentication → Settings → Authorized domains)
-- **API keys** (verified with `gcloud services api-keys list`, 2026-09-19): the web key in `firebase-init.js` is the "Browser key", limited to the Firestore and Identity Toolkit APIs with no HTTP referrer restriction (left that way, decided-by-user 2026-09-19). The shipped tvOS app uses the key Firebase named "iOS key" (Firebase registers a tvOS app as an iOS app); it has been in `GoogleService-Info.plist` since 2026-02-14, before 1.0 shipped, so never delete it. The key named "tvOS key" is the one with the `co.dgrlabs.flipflap` bundle restriction, but no shipped build uses it (0 requests in the 42 days to 2026-09-19).
+- **API keys** (verified with `gcloud services api-keys list`, 2026-09-19): the web key in `firebase-init.js` is the "Browser key", limited to the Firestore and Identity Toolkit APIs with no HTTP referrer restriction (left that way, decided-by-user 2026-09-19). **That API list is a defect, not hardening** (found 2026-09-19, proposed-by-agent, not fixed yet): it leaves out `securetoken.googleapis.com` (Token Service API), which Firebase Auth uses to refresh ID tokens, so every web refresh fails (45 of 45 requests with this key returned 403 in the 41 days to 2026-09-19, against 269 of 269 returning 200 for the tvOS app's key). Web auth dies about an hour after page load, and the health-check, 403-interceptor, and force-reauth code in `display.js` recovers by creating a new anonymous user; `control.js` has no recovery. See `docs/AUDIT_2026-09.md`. The shipped tvOS app uses the key Firebase named "iOS key" (Firebase registers a tvOS app as an iOS app); it has been in `GoogleService-Info.plist` since 2026-02-14, before 1.0 shipped, so never delete it. The key named "tvOS key" is the one with the `co.dgrlabs.flipflap` bundle restriction, but no shipped build uses it (0 requests in the 42 days to 2026-09-19).
 - Web config in `firebase-init.js`, tvOS config via `GoogleService-Info.plist`
 
 ### Firestore Security Rules
@@ -134,7 +143,11 @@ The `rooms` collection must be explicitly allowed. Without this, real-time `onSn
 
 Key points:
 - `request.auth != null` allows anonymous auth (used by both web and tvOS)
-- Use `allow read` (not `allow get`) to support `onSnapshot()` real-time listeners
+- The rules grant `read` (`get` plus `list`). An earlier version of this file said `onSnapshot()` needs `read` and not `get`; that looks like folklore (proposed-by-agent 2026-09-19). Firebase's rules docs say `get` applies to single-document reads and `list` to queries, and production showed 4,428 GET rule evaluations and zero LIST evaluations in 41 days with listeners live. Narrowing to `allow get` is in the plan, but nobody has run it under the emulator or against live yet, so test a single-document listener first
 - Room IDs must match `^[A-Z0-9]{4,12}$` (both clients generate 6–8 characters)
 - Writes must carry `text` as a string of at most 10,000 characters; every client write already does
 - No client deletes rooms. The `expiresAt` TTL policy removes them server-side, so delete is denied
+
+## Audit and plan
+
+`docs/AUDIT_2026-09.md` is the September 2026 from-scratch audit and the prioritized plan that came out of it (proposed-by-agent 2026-09-19; no item is approved until Charlie says so). Read it before touching the connection code in `display.js` or `RoomViewModel.swift`, the rules, or the layout ports.
