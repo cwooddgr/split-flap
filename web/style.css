@@ -263,6 +263,12 @@ body {
     border-radius: 8px;
 }
 
+#qrcode canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
 #qr-container.hidden {
     display: none;
 }

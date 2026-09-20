@@ -1,5 +1,6 @@
 import { db, doc, onSnapshot, ensureSignedIn, backoffMs } from './firebase-init.js';
 import { SplitFlapDisplay } from './splitflap.js';
+import qrcode from './vendor/qrcode-generator.mjs';
 
 // Small-screen handling: show a simple message instead of the display UI
 const SMALL_SCREEN_MAX_WIDTH = 768; // adjust threshold if you like
@@ -64,21 +65,32 @@ function setTrouble(message) {
 // so it goes up before anything touches the network.
 const qrElement = document.getElementById('qrcode');
 const qrContainer = document.getElementById('qr-container');
-if (qrElement && window.QRCode) {
+if (qrElement) {
     const controlUrl = new URL('control.html', window.location.href);
     controlUrl.searchParams.set('room', roomId);
     // Also store room in the hash as a fallback, in case query params are stripped
     controlUrl.hash = 'room=' + roomId;
 
-    // eslint-disable-next-line no-new
-    new QRCode(qrElement, {
-        text: controlUrl.toString(),
-        width: 112,
-        height: 112,
-        colorDark: '#000000',
-        colorLight: '#ffffff',
-        correctLevel: window.QRCode.CorrectLevel.M,
-    });
+    // Version picked to fit (0), error correction M. Drawn edge to edge at 8
+    // canvas pixels a module; the stylesheet scales it to the 112px box.
+    const qr = qrcode(0, 'M');
+    qr.addData(controlUrl.toString());
+    qr.make();
+    const count = qr.getModuleCount();
+    const cell = 8;
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = count * cell;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#000000';
+    for (let row = 0; row < count; row++) {
+        for (let col = 0; col < count; col++) {
+            if (qr.isDark(row, col)) ctx.fillRect(col * cell, row * cell, cell, cell);
+        }
+    }
+    qrElement.title = controlUrl.toString();
+    qrElement.appendChild(canvas);
 }
 
 // The sound prompt is up only while the browser is holding audio back for a

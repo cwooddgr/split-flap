@@ -67,6 +67,7 @@ Firebase SDK is managed via Swift Package Manager (configured in the Xcode proje
 - `splitflap.js` - Core `SplitFlapDisplay` class: the board and its one animation clock (layout comes from `layout.js`, sound from `sound.js`)
 - `sound.js` - `FlipSound`: the tvOS app's 12 recorded clacks, a few per tick with random gain and timing, through one gain and a compressor. `clacks.wav` is those 12 samples end to end (3,527 frames each, made from `tvos/.../Sounds/*.caf` with `afconvert` and Python's `wave`)
 - `display.js` - Display page: room creation, Firebase `onSnapshot` listener, QR code
+- `vendor/qrcode-generator.mjs` - Kazuhiko Arase's `qrcode-generator` 2.0.4 (MIT), `dist/qrcode.mjs` from the npm package, unmodified. `display.js` draws the QR code with it; nothing is loaded from a CDN except the Firebase SDK (12.19.0 from gstatic)
 - `control.js` - Remote page: text input, preset quotes, Firebase writes
 - `firebase-init.js` - Firebase config, initialization, auth helpers (shared by display + control)
 
