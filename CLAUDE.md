@@ -20,7 +20,7 @@ python -m http.server 8000 -d web
 # Scan QR code with phone to get control.html link
 ```
 
-The web app is pure static files using ES modules (`import`/`export`). Firebase SDK is loaded via CDN in `firebase-init.js`. A page loaded from a local server still signs in to the production Firebase project.
+The web app is pure static files using ES modules (`import`/`export`). The Firebase SDK is loaded from Google's CDN in `firebase-core.js`, `firebase-init.js`, and `firebase-lite.js`. A page loaded from a local server still signs in to the production Firebase project.
 
 **Deploy:** `.github/workflows/pages.yml` publishes `web/`, and only `web/`, to `flipflap.dgrlabs.co` on every push to `main` that touches it (since 2026-09-20; before that GitHub Pages served the whole repo root, notes and tvOS sources included). The custom domain lives in the repo's Pages settings; the root `CNAME` file is ignored by a workflow deploy and is kept only so a rollback to branch publishing would work. `web/control.html` must keep its name and place, because the shipped tvOS app hardcodes `https://flipflap.dgrlabs.co/control.html`. Anything that should not be public on the product domain stays out of `web/`. Plain http redirects to https at Cloudflare: "Always Use HTTPS" is on for the whole dgrlabs.co zone since 2026-09-20 (decided-by-user; `itdept/changelog/2026-09-20-dgrlabs-co-always-use-https.md`), because GitHub Pages can't enforce HTTPS behind Cloudflare's proxy.
 
@@ -69,7 +69,9 @@ Firebase SDK is managed via Swift Package Manager (configured in the Xcode proje
 - `display.js` - Display page: room creation, Firebase `onSnapshot` listener, QR code
 - `vendor/qrcode-generator.mjs` - Kazuhiko Arase's `qrcode-generator` 2.0.4 (MIT), `dist/qrcode.mjs` from the npm package, unmodified. `display.js` draws the QR code with it; nothing is loaded from a CDN except the Firebase SDK (12.19.0 from gstatic)
 - `control.js` - Remote page: text input, preset quotes, Firebase writes
-- `firebase-init.js` - Firebase config, initialization, auth helpers (shared by display + control)
+- `firebase-core.js` - Firebase config, the app, anonymous auth, `ensureSignedIn`, and `backoffMs` (shared by display + control)
+- `firebase-init.js` - Firestore for the display: the full SDK with forced long polling
+- `firebase-lite.js` - Firestore for the remote: Firestore Lite (REST, 37 KB compressed against 179 KB for the full SDK). **Lite has no offline queue (decided-by-user 2026-09-20, Charlie's "1b"):** a send with no connection fails at once, the remote says "Couldn't send. Try again.", and nothing is sent later
 
 ### tvOS App (`tvos/SplitFlapTV/SplitFlapTV/`)
 - `ContentView.swift` - Root view: room ID generation, QR code toggle, board container
@@ -135,8 +137,8 @@ The web display follows the same design since 2026-09-20 (live that day, `da2314
 - **Anonymous authentication** enabled
 - **Authorized domains** configured (Firebase Console → Authentication → Settings → Authorized domains)
 - **API keys** (verified with `gcloud services api-keys list`, 2026-09-19): the web key in `firebase-init.js` is the "Browser key", limited to the Firestore and Identity Toolkit APIs with no HTTP referrer restriction (left that way, decided-by-user 2026-09-19). **Fixed 2026-09-20 (decided-by-user): the key now also allows `securetoken.googleapis.com`**, and a test refresh with the web key returned 200. Until then the list was a defect, not hardening (found 2026-09-19): it left out `securetoken.googleapis.com` (Token Service API), which Firebase Auth uses to refresh ID tokens, so every web refresh failed (45 of 45 requests with this key returned 403 in the 41 days to 2026-09-19, against 269 of 269 returning 200 for the tvOS app's key). Web auth died about an hour after page load, and the health-check, 403-interceptor, and force-reauth code in `display.js` recovered by creating a new anonymous user; `control.js` had no recovery. The soak read clean on 2026-09-20 (a display tab open for two hours refreshed at 55 and 110 minutes, 200 each time, no 403 and no new sign-up beside either), and that scaffolding was deleted the same day: `display.js` keeps one listener and resubscribes with backoff only if it errors, and nothing in the web app signs out. Don't bring any of it back for a "connection" problem without first checking the key's API list and the rules (see `docs/AUDIT_2026-09.md`). Never restrict this key to fewer than those three APIs. The shipped tvOS app uses the key Firebase named "iOS key" (Firebase registers a tvOS app as an iOS app); it has been in `GoogleService-Info.plist` since 2026-02-14, before 1.0 shipped, so never delete it. The key named "tvOS key" is the one with the `co.dgrlabs.flipflap` bundle restriction, but no shipped build uses it (0 requests in the 42 days to 2026-09-19).
-- Web config in `firebase-init.js`, tvOS config via `GoogleService-Info.plist`
-- **The web app forces Firestore long polling** (`initializeFirestore(app, { experimentalForceLongPolling: true })`, decided-by-user 2026-09-20). Since Safari 26.4 WebKit holds the last frame of a streamed response until more data arrives, so with the default connection a display in Safari showed each message only when the next one was sent (firebase-js-sdk issue #9789; measured here in Safari 27.0: 2 of 6 writes on time with the default, 6 of 6 with long polling). Don't go back to `getFirestore(app)` without repeating that test in Safari, even after Apple ships a fix
+- Web config in `firebase-core.js`, tvOS config via `GoogleService-Info.plist`
+- **The web display forces Firestore long polling** (`initializeFirestore(app, { experimentalForceLongPolling: true })`, decided-by-user 2026-09-20). Since Safari 26.4 WebKit holds the last frame of a streamed response until more data arrives, so with the default connection a display in Safari showed each message only when the next one was sent (firebase-js-sdk issue #9789; measured here in Safari 27.0: 2 of 6 writes on time with the default, 6 of 6 with long polling). Don't go back to `getFirestore(app)` without repeating that test in Safari, even after Apple ships a fix
 
 ### Firestore Security Rules
 

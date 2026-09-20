@@ -1,4 +1,4 @@
-import { db, doc, setDoc, serverTimestamp, ensureSignedIn } from './firebase-init.js';
+import { db, doc, setDoc, serverTimestamp, ensureSignedIn } from './firebase-lite.js';
 
 // Room id can come from either the query string (?room=ABC123) or the hash (#room=ABC123)
 const params = new URLSearchParams(window.location.search);
@@ -158,8 +158,8 @@ const signedIn = ensureSignedIn();
         const expiresAt = new Date(Date.now() + WEEK_MS);
 
         report('Sending…');
-        // Offline, the SDK queues the write and the promise stays pending until
-        // the server has it. Say so instead of looking stuck.
+        // On a slow connection the request can take a while. Say so instead of
+        // looking stuck.
         const slowTimer = setTimeout(() => report('Still trying to send…'), SLOW_SEND_MS);
         try {
             await signedIn;
@@ -175,8 +175,8 @@ const signedIn = ensureSignedIn();
             );
             report('Sent');
         } catch (err) {
-            // A rejection means the server refused the write (rules), not a bad
-            // connection.
+            // Firestore Lite doesn't queue: a rejection is either no connection
+            // or the server refusing the write (rules). Nothing is sent later.
             console.error('Error writing message to room', err);
             report("Couldn't send. Try again.", true);
         } finally {

@@ -37,7 +37,9 @@ The display shows a grid of animated split‑flap cells; a separate “remote”
   - `splitflap.js` – Split‑flap board rendering and animation.
   - `display.js` – Wires the display page to Firebase + QR code.
   - `control.js` – Wires the remote page to Firebase and presets.
-  - `firebase-init.js` – Shared Firebase initialization (web).
+  - `firebase-core.js` – Firebase config, app, and anonymous sign-in, shared by both pages.
+  - `firebase-init.js` – Firestore for the display (the full SDK, for its realtime listener).
+  - `firebase-lite.js` – Firestore for the remote (Firestore Lite, which only needs to write).
   - `docs/PROTOCOL.md` – Human‑readable description of the Firestore data model and protocol.
 
 - **tvOS app** (current version: **1.1**, build 2)
@@ -104,7 +106,7 @@ The display shows a grid of animated split‑flap cells; a separate “remote”
 2. Under **Web apps**, either:
    - Use the existing app for this project, or
    - Register a new web app (no hosting required).
-3. Copy the `firebaseConfig` block and paste it into `firebase-init.js`:
+3. Copy the `firebaseConfig` block and paste it into `firebase-core.js`:
 
 ```js
 const firebaseConfig = {
