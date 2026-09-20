@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 Split-Flap is a minimalist split-flap style message board with two implementations:
-- **Web app**: Static HTML/CSS/JS for display (`index.html`) and remote control (`control.html`)
+- **Web app**: Static HTML/CSS/JS in `web/`, for display (`index.html`) and remote control (`control.html`)
 - **tvOS app**: Native SwiftUI app for Apple TV (`tvos/SplitFlapTV/`)
 
 Both connect to the same Firebase backend (Firestore). A display generates a random `roomId`, shows a QR code linking to the remote, and listens for real-time updates. The remote writes text to `rooms/{roomId}` in Firestore, and the display animates split-flap tiles to show it.
@@ -15,12 +15,14 @@ Both connect to the same Firebase backend (Firestore). A display generates a ran
 ### Web App (no build step, no dependencies)
 
 ```bash
-python -m http.server 8000
+python -m http.server 8000 -d web
 # Open http://localhost:8000/index.html on display
 # Scan QR code with phone to get control.html link
 ```
 
-The web app is pure static files using ES modules (`import`/`export`). Firebase SDK is loaded via CDN in `firebase-init.js`. Hosted at `flipflap.dgrlabs.co` (see `CNAME`).
+The web app is pure static files using ES modules (`import`/`export`). Firebase SDK is loaded via CDN in `firebase-init.js`. A page loaded from a local server still signs in to the production Firebase project.
+
+**Deploy:** `.github/workflows/pages.yml` publishes `web/`, and only `web/`, to `flipflap.dgrlabs.co` on every push to `main` that touches it (since 2026-09-20; before that GitHub Pages served the whole repo root, notes and tvOS sources included). The custom domain lives in the repo's Pages settings; the root `CNAME` file is ignored by a workflow deploy and is kept only so a rollback to branch publishing would work. `web/control.html` must keep its name and place, because the shipped tvOS app hardcodes `https://flipflap.dgrlabs.co/control.html`. Anything that should not be public on the product domain stays out of `web/`.
 
 ### tvOS App
 
@@ -60,7 +62,7 @@ Firebase SDK is managed via Swift Package Manager (configured in the Xcode proje
 
 ## Key Files
 
-### Web App
+### Web App (`web/`)
 - `layout.js` - Pure layout: `CHARSET` and `layoutText(text, cols, rows)`, no DOM. The spec for it is `shared/layout-fixtures.json`
 - `splitflap.js` - Core `SplitFlapDisplay` class: rendering engine, animation loop, sound (layout comes from `layout.js`)
 - `display.js` - Display page: room creation, Firebase `onSnapshot` listener, QR code
@@ -80,7 +82,6 @@ Firebase SDK is managed via Swift Package Manager (configured in the Xcode proje
 
 ### Protocol
 - `docs/PROTOCOL.md` - Canonical Firestore document shape and contracts
-- `shared/protocol.ts` - TypeScript interfaces. Nothing imports it, there is no TypeScript build, and it is stale (no `expiresAt`, rows = 6); trust `docs/PROTOCOL.md` and `firestore.rules` over it
 
 ## Board Dimensions
 

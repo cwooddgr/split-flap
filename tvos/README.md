@@ -27,7 +27,7 @@ SplitFlapTV/
     ViewModels/
       RoomViewModel.swift         # Firestore subscription + anonymous auth
     Layout/                       # No UI imports; `swift test` in tvos/ builds just this folder
-      BoardLayout.swift           # Word-wrap / centering (Swift port of layout.js)
+      BoardLayout.swift           # Word-wrap / centering (Swift port of web/layout.js)
       BoardCharset.swift          # The 73 characters and the one-step advance
     Views/
       BoardView.swift             # Canvas board, glyph cache, animation coordinator, CHARSET

@@ -18,11 +18,11 @@ disagree, the rules win. Last checked against the code on 2026-09-19.
   - Web display: `cols = 21`, `rows = 6`
   - tvOS display: `cols = 21`, `rows = 8`
 - Each cell displays a single character from a fixed set of 73 characters (`CHARSET`, defined in
-  `layout.js` and again in `Layout/BoardCharset.swift`; tests check both against
+  `web/layout.js` and again in `Layout/BoardCharset.swift`; tests check both against
   `shared/layout-fixtures.json`):
   - Space, `A–Z`, `0–9`
   - Common punctuation and a few extra glyphs (quotes, degree symbol, dashes, …)
-- Rendering rules (as implemented in `layout.js`, with the exact expected output for a set of
+- Rendering rules (as implemented in `web/layout.js`, with the exact expected output for a set of
   inputs in `shared/layout-fixtures.json`):
   - Text is wrapped at **word boundaries** to fit `cols`.
   - The *block of text* (all lines together) is:
@@ -196,39 +196,9 @@ Canonical behavior:
 
 - `ContentView.swift` generates a random `roomId` once per launch and builds the QR URL.
 - `RoomViewModel.swift` signs in anonymously, then attaches a snapshot listener to `rooms/{roomId}`.
-- `Layout/BoardLayout.swift` is a Swift port of `layout.js`, used with `BoardConfig(cols: 21, rows: 8)`.
+- `Layout/BoardLayout.swift` is a Swift port of `web/layout.js`, used with `BoardConfig(cols: 21, rows: 8)`.
 
 No other coupling exists between the display and controller beyond the shared
 `rooms/{roomId}` document and the `text` field.
 
----
-
-## Canonical TypeScript shapes
-
-The `shared/protocol.ts` file contains convenience interfaces that roughly mirror this
-document. They are **non‑authoritative**: nothing imports the file, and it predates `expiresAt`
-and the 8-row tvOS board.
-
-```ts
-export interface BoardConfig {
-  cols: number;
-  rows: number;
-  charsetDescription?: string;
-}
-
-export interface Message {
-  text: string;
-  source?: string;
-  updatedAt?: string;
-}
-
-export interface RoomState {
-  text: string;
-  source?: string;
-  updatedAt?: string;
-}
-```
-
-The tvOS app defines its equivalents in `Models/RoomState.swift`.
-
-
+The tvOS app defines its model types in `Models/RoomState.swift`.

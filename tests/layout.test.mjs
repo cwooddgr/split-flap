@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { CHARSET, layoutText } from '../layout.js';
+import { CHARSET, layoutText } from '../web/layout.js';
 
 const spec = JSON.parse(readFileSync(new URL('../shared/layout-fixtures.json', import.meta.url), 'utf8'));
 

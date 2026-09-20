@@ -16,7 +16,7 @@ import { getFirestore, doc, onSnapshot, setDoc, getDocs, collection, serverTimes
 
 const strict = process.argv.includes("--strict");
 const ROOM = "HEALTHCHK0";
-const src = readFileSync(new URL("../firebase-init.js", import.meta.url), "utf8");
+const src = readFileSync(new URL("../web/firebase-init.js", import.meta.url), "utf8");
 const pick = (k) => src.match(new RegExp(`${k}:\\s*"([^"]+)"`))[1];
 const app = initializeApp({ apiKey: pick("apiKey"), authDomain: pick("authDomain"), projectId: pick("projectId"), appId: pick("appId") });
 const db = getFirestore(app);

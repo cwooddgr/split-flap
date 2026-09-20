@@ -1,6 +1,6 @@
 ## Flip Flap
 
-![Flip Flap display showing a message](hero.png)
+![Flip Flap display showing a message](docs/hero.png)
 
 A minimalist split‑flap style message board that runs on the web (for the display and remote) and on Apple TV (tvOS).  
 The display shows a grid of animated split‑flap cells; a separate “remote” page or the tvOS app sends text to show via Firebase.
@@ -29,7 +29,7 @@ The display shows a grid of animated split‑flap cells; a separate “remote”
 
 ## Project Structure
 
-- **Web app (static site)**
+- **Web app (static site, everything in `web/`; only that folder is published to flipflap.dgrlabs.co)**
   - `index.html` – Display page for the board.
   - `control.html` – Remote controller UI for phones.
   - `style.css` – Shared styling for display and remote.
@@ -38,7 +38,6 @@ The display shows a grid of animated split‑flap cells; a separate “remote”
   - `display.js` – Wires the display page to Firebase + QR code.
   - `control.js` – Wires the remote page to Firebase and presets.
   - `firebase-init.js` – Shared Firebase initialization (web).
-  - `shared/protocol.ts` – Shared TypeScript description of the room protocol.
   - `docs/PROTOCOL.md` – Human‑readable description of the Firestore data model and protocol.
 
 - **tvOS app** (current version: **1.1**, build 2)
@@ -192,7 +191,7 @@ Because the app is 100% static, you can use any static file server. For example,
 
 ```bash
 cd sf
-python -m http.server 8000
+python -m http.server 8000 -d web
 ```
 
 Then:
