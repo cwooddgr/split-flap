@@ -40,7 +40,7 @@ The display shows a grid of animated split‑flap cells; a separate “remote”
   - `shared/protocol.ts` – Shared TypeScript description of the room protocol.
   - `docs/PROTOCOL.md` – Human‑readable description of the Firestore data model and protocol.
 
-- **tvOS app** (current version: **1.0**, build 1)
+- **tvOS app** (current version: **1.1**, build 2)
   - `tvos/README.md` – tvOS‑specific notes.
   - `tvos/SplitFlapTV/` – SwiftUI tvOS project.
     - `SplitFlapTVApp.swift` – App entry point.
@@ -122,27 +122,15 @@ const firebaseConfig = {
 
 ## Firestore Security Rules
 
-In Firebase Console → Firestore → Rules, add rules for the `rooms` collection. The app uses anonymous authentication, so rules must allow `request.auth != null`:
+The rules are in [`firestore.rules`](firestore.rules) at the root of this repo. The app signs in anonymously, so the rules accept any signed-in user (`request.auth != null`). They also require room IDs to be 4 to 12 characters from A–Z and 0–9, require every write to carry `text` as a string of at most 10,000 characters, and deny deletes and everything outside the `rooms` collection. Old rooms are removed by a Firestore TTL policy on `expiresAt`.
 
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // Split-flap rooms - authenticated users can read/write
-    match /rooms/{roomId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null
-        && request.resource.data.text is string
-        && request.resource.data.text.size() <= 10000;
-    }
+Deploy them with the Firebase CLI (`.firebaserc` names the project, so change it to yours first):
 
-    // Deny all other access by default
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
+```bash
+firebase deploy --only firestore:rules
 ```
+
+You can also paste the file's contents into Firebase Console → Firestore → Rules.
 
 **Important:** Use `allow read` (not separate `allow get`/`allow list`) to ensure real-time listeners work correctly.
 

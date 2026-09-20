@@ -24,7 +24,7 @@ The web app is pure static files using ES modules (`import`/`export`). Firebase 
 
 ### tvOS App
 
-Current version: **1.0** (build 1). Bundle ID `co.dgrlabs.flipflap`, deployment target tvOS 17.0. Bump `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in `tvos/SplitFlapTV/SplitFlapTV.xcodeproj/project.pbxproj` (two occurrences each — Debug and Release).
+Current version: **1.1** (build 2), live on the App Store since 2026-07-10 (App Store lookup, 2026-09-19). Bundle ID `co.dgrlabs.flipflap`, deployment target tvOS 17.0. Bump `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in `tvos/SplitFlapTV/SplitFlapTV.xcodeproj/project.pbxproj` (two occurrences each — Debug and Release).
 
 ```bash
 open tvos/SplitFlapTV/SplitFlapTV.xcodeproj
