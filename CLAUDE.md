@@ -24,7 +24,7 @@ The web app is pure static files using ES modules (`import`/`export`). Firebase 
 
 ### tvOS App
 
-Current version: **1.1** (build 2), live on the App Store since 2026-07-10 (App Store lookup, 2026-09-19). Bundle ID `co.dgrlabs.flipflap`, deployment target tvOS 17.0. Bump `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in `tvos/SplitFlapTV/SplitFlapTV.xcodeproj/project.pbxproj` (two occurrences each — Debug and Release).
+Current version: **1.1** (build 2), live on the App Store since 2026-07-10 (App Store lookup, 2026-09-19). **`main` is ahead of 1.1** (as of 2026-09-20; nothing submitted, 1.2 not scheduled, decided-by-user that day to cut it later): the audio session is set to `.ambient` at launch so the app no longer stops the user's music (1.1 does, at the first flap; confirmed on a device), the audio engine restarts after a route change (never reproduced), and the layout is the new fixture-tested port (breaks long words across lines, folds accents, no triple spaces). Put those in What's New when 1.2 is drafted. Bundle ID `co.dgrlabs.flipflap`, deployment target tvOS 17.0. Bump `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in `tvos/SplitFlapTV/SplitFlapTV.xcodeproj/project.pbxproj` (two occurrences each — Debug and Release).
 
 ```bash
 open tvos/SplitFlapTV/SplitFlapTV.xcodeproj
