@@ -1,18 +1,18 @@
 // Shared Firebase initialization module
 // Fill in firebaseConfig with your own project's settings.
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
 import {
     initializeFirestore,
     doc,
     setDoc,
     onSnapshot,
     serverTimestamp,
-} from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
 import {
     getAuth,
     signInAnonymously,
-} from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
+} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
