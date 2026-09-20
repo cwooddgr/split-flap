@@ -64,7 +64,8 @@ Firebase SDK is managed via Swift Package Manager (configured in the Xcode proje
 
 ### Web App (`web/`)
 - `layout.js` - Pure layout: `CHARSET` and `layoutText(text, cols, rows)`, no DOM. The spec for it is `shared/layout-fixtures.json`
-- `splitflap.js` - Core `SplitFlapDisplay` class: rendering engine, animation loop, sound (layout comes from `layout.js`)
+- `splitflap.js` - Core `SplitFlapDisplay` class: the board and its one animation clock (layout comes from `layout.js`, sound from `sound.js`)
+- `sound.js` - `FlipSound`: the tvOS app's 12 recorded clacks, a few per tick with random gain and timing, through one gain and a compressor. `clacks.wav` is those 12 samples end to end (3,527 frames each, made from `tvos/.../Sounds/*.caf` with `afconvert` and Python's `wave`)
 - `display.js` - Display page: room creation, Firebase `onSnapshot` listener, QR code
 - `control.js` - Remote page: text input, preset quotes, Firebase writes
 - `firebase-init.js` - Firebase config, initialization, auth helpers (shared by display + control)
@@ -111,7 +112,7 @@ Character set: Space, A-Z, 0-9, common punctuation, smart quotes, degree symbol,
 
 The tvOS app uses a centralized animation coordinator (single `Task` with a timer loop) instead of per-tile async tasks. One animation tick advances all tiles one step through `CHARSET` toward their targets, with one batched state update per tick (`tickInterval` = 60 ms in `BoardView.swift`; each flap takes 40 ms plus up to 18 ms of per-tile stagger). The board is a single `Canvas` that draws cached glyph half-images, so no text is laid out per frame. Both decisions came out of the July 2026 performance work on the A10X and are critical on Apple TV hardware; don't undo either without new measurements.
 
-The web display has not had the same treatment. `splitflap.js` still runs one `setTimeout` chain per tile, creates and removes a DOM node per step, and synthesizes a fresh noise buffer per click.
+The web display follows the same design since 2026-09-20 (written that day; see the Phase 4 status note in `docs/AUDIT_2026-09.md` for whether it is pushed). `splitflap.js` runs one `requestAnimationFrame` clock with the tvOS timings (60 ms tick, 40 ms flap, up to 18 ms stagger). Each tile keeps four faces in the DOM, and its two moving faces each own one Web Animations `Animation` that is made at init and replayed per flip, so nothing is created while the board runs. A late frame advances tiles by every tick it missed, so a slow machine skips steps and keeps the duration. The board jumps straight to its target, silently, when the tab is hidden or `prefers-reduced-motion` is set. Tile size comes from one CSS unit (`--u` on `.display-board`, the largest tile that fits the window both ways), so the board has no maximum size.
 
 ## Firestore Document Shape
 

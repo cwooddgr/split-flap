@@ -70,29 +70,85 @@ if (qrElement && window.QRCode) {
     // Also store room in the hash as a fallback, in case query params are stripped
     controlUrl.hash = 'room=' + roomId;
 
+    // Drawn large; the stylesheet scales it to the screen.
     // eslint-disable-next-line no-new
     new QRCode(qrElement, {
         text: controlUrl.toString(),
-        width: 112,
-        height: 112,
+        width: 512,
+        height: 512,
         colorDark: '#000000',
         colorLight: '#ffffff',
         correctLevel: window.QRCode.CorrectLevel.M,
     });
 }
 
-// The first tap or click enables sound (SplitFlapDisplay.initAudio listens for
-// the same interaction) and dismisses the prompt. Later ones toggle the QR code.
+// The sound prompt is up only while the browser is holding audio back for a
+// tap, click, or key press. FlipSound resumes on that gesture by itself.
 const audioPromptEl = document.getElementById('audioPrompt');
+function showAudioPrompt(needsGesture) {
+    if (audioPromptEl && !isSmallScreen) {
+        audioPromptEl.classList.toggle('hidden', !needsGesture);
+    }
+}
+display.sound.onStateChange = showAudioPrompt;
+showAudioPrompt(display.sound.needsGesture);
+
+// A click that enables sound does only that. Any other click toggles the QR code.
 document.addEventListener('click', () => {
-    if (audioPromptEl && !audioPromptEl.classList.contains('hidden')) {
-        audioPromptEl.classList.add('hidden');
-        return;
-    }
-    if (qrContainer && !isSmallScreen) {
-        qrContainer.style.display = qrContainer.style.display === 'none' ? '' : 'none';
-    }
+    if (audioPromptEl && !audioPromptEl.classList.contains('hidden')) return;
+    if (qrContainer && !isSmallScreen) qrContainer.classList.toggle('hidden');
 });
+
+// Once a remote has sent something, the QR code has done its job. A click
+// brings it back for the next phone.
+let hidQrForFirstMessage = false;
+function hideQrAfterFirstMessage() {
+    if (hidQrForFirstMessage) return;
+    hidQrForFirstMessage = true;
+    if (qrContainer) qrContainer.classList.add('hidden');
+}
+
+// Keep the screen awake. The lock is released whenever the tab is hidden, so
+// ask again each time it comes back. Not every browser has it.
+async function keepAwake() {
+    if (!('wakeLock' in navigator) || document.hidden) return;
+    try {
+        await navigator.wakeLock.request('screen');
+    } catch (error) {
+        console.warn('No wake lock, the screen may sleep', error);
+    }
+}
+document.addEventListener('visibilitychange', keepAwake);
+keepAwake();
+
+// Full-screen button, where the browser can do it (not on an iPhone).
+const fullscreenBtn = document.getElementById('fullscreenBtn');
+if (fullscreenBtn && document.documentElement.requestFullscreen && !isSmallScreen) {
+    fullscreenBtn.classList.remove('hidden');
+    fullscreenBtn.addEventListener('click', (event) => {
+        event.stopPropagation(); // not a QR toggle
+        if (document.fullscreenElement) {
+            document.exitFullscreen();
+        } else {
+            document.documentElement.requestFullscreen().catch(() => {});
+        }
+    });
+    document.addEventListener('fullscreenchange', () => {
+        fullscreenBtn.textContent = document.fullscreenElement ? 'Exit full screen' : 'Full screen';
+    });
+}
+
+// Hide the pointer and the button once the mouse has been still for a while.
+const POINTER_IDLE_MS = 3000;
+let pointerTimer = null;
+function pointerMoved() {
+    document.body.classList.remove('pointer-idle');
+    clearTimeout(pointerTimer);
+    pointerTimer = setTimeout(() => document.body.classList.add('pointer-idle'), POINTER_IDLE_MS);
+}
+document.addEventListener('pointermove', pointerMoved);
+document.addEventListener('pointerdown', pointerMoved); // a touch screen has no hover
+pointerMoved();
 
 // One listener for the life of the page. The SDK reconnects it and refreshes
 // the auth token without help. Snapshot metadata is the only connection signal:
@@ -118,6 +174,7 @@ function listen() {
             const data = snapshot.data();
             if (typeof data.text === 'string') {
                 display.setText(data.text);
+                hideQrAfterFirstMessage();
             }
         },
         (error) => {

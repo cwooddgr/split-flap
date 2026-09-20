@@ -1,7 +1,42 @@
-// Split-flap display module
-// Extracted from the original script.js so it can be reused by both pages.
+// Split-flap board for the web display. The same design as the tvOS board
+// (Views/BoardView.swift): one clock for the whole board, every tile advancing
+// one charset step per tick, and nothing created after init.
+//
+// Each tile has four faces that stay in the DOM:
+//   top        (still)   the new character's top half, revealed behind the flap
+//   bottom     (still)   the old character's bottom half, until the flap lands
+//   fallTop    (moving)  the old top half, folding down to the split line
+//   fallBottom (moving)  the new bottom half, swinging down from the split line
+// The two moving faces each own one Animation made at init and replayed on every
+// flip. It animates only transform and filter.
 
 import { CHARSET, layoutText } from './layout.js';
+import { FlipSound } from './sound.js';
+
+// Timing matches the tvOS board.
+const TICK_MS = 60;
+const FLIP_MS = 40;
+const MAX_STAGGER_MS = 18;
+
+// The flap falls under gravity: eased = p². It is the old top half until
+// eased reaches 0.5 (p = 0.707) and the new bottom half after that. Each
+// cubic-bezier below is that parabola's segment, exactly.
+const HANDOFF = Math.SQRT1_2;
+const FALL_TOP_KEYFRAMES = [
+    { offset: 0, transform: 'scaleY(1)', filter: 'brightness(1)', easing: 'cubic-bezier(0.333, 0, 0.667, 0.333)' },
+    { offset: HANDOFF, transform: 'scaleY(0)', filter: 'brightness(0.5)' },
+    { offset: 1, transform: 'scaleY(0)', filter: 'brightness(0.5)' },
+];
+const FALL_BOTTOM_KEYFRAMES = [
+    { offset: 0, transform: 'scaleY(0)', filter: 'brightness(0.5)' },
+    { offset: HANDOFF, transform: 'scaleY(0)', filter: 'brightness(0.5)', easing: 'cubic-bezier(0.333, 0.276, 0.667, 0.609)' },
+    { offset: 1, transform: 'scaleY(1)', filter: 'brightness(1)' },
+];
+
+// Fixed per-tile delay so neighbors flip a few ms apart and not in unison.
+function stagger(row, col) {
+    return (((row * 7919 + col * 104729) % 977) / 977) * MAX_STAGGER_MS;
+}
 
 class SplitFlapDisplay {
     constructor(containerOrId, cols = 22, rows = 4) {
@@ -17,112 +52,69 @@ class SplitFlapDisplay {
         this.container = container;
         this.cols = cols;
         this.rows = rows;
-        this.flaps = [];
-        this.audioContext = null;
+        this.tiles = [];
+        this.sound = new FlipSound();
+        this.frameId = null;
+        this.lastTickAt = 0;
+        this.reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
         this.init();
-        this.initAudio();
-    }
 
-    initAudio() {
-        // Initialize Web Audio API for click sounds
-        this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-
-        // iOS/Safari require user interaction to enable audio
-        const enableAudio = () => {
-            if (this.audioContext.state === 'suspended') {
-                this.audioContext.resume();
-            }
-            // Remove listeners after first interaction
-            document.removeEventListener('touchstart', enableAudio);
-            document.removeEventListener('click', enableAudio);
-        };
-
-        document.addEventListener('touchstart', enableAudio, { once: true });
-        document.addEventListener('click', enableAudio, { once: true });
-    }
-
-    playClickSound() {
-        if (!this.audioContext) return;
-
-        const now = this.audioContext.currentTime;
-
-        // Create a sharp mechanical click using noise
-        const bufferSize = this.audioContext.sampleRate * 0.03; // 30ms buffer
-        const buffer = this.audioContext.createBuffer(
-            1,
-            bufferSize,
-            this.audioContext.sampleRate
-        );
-        const data = buffer.getChannelData(0);
-
-        // Generate noise that decays quickly for a click sound
-        for (let i = 0; i < bufferSize; i++) {
-            const decay = Math.exp(-i / (bufferSize * 0.1));
-            data[i] = (Math.random() * 2 - 1) * decay;
-        }
-
-        const source = this.audioContext.createBufferSource();
-        const gainNode = this.audioContext.createGain();
-
-        source.buffer = buffer;
-        source.connect(gainNode);
-        gainNode.connect(this.audioContext.destination);
-
-        // Quick, punchy click
-        gainNode.gain.setValueAtTime(0.2, now);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.03);
-
-        source.start(now);
+        // A hidden tab gets no animation frames, so the board jumps to its
+        // target and is right when the tab comes back.
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) this.snap();
+        });
     }
 
     init() {
-        // Create rows and flap elements
+        // The stylesheet sizes the tiles from the viewport and the grid.
+        this.container.style.setProperty('--cols', this.cols);
+        this.container.style.setProperty('--rows', this.rows);
+
+        const makeFace = (className) => {
+            const face = document.createElement('div');
+            face.className = `flap-half ${className}`;
+            const content = document.createElement('div');
+            content.className = 'flap-content';
+            content.textContent = ' ';
+            face.appendChild(content);
+            return { face, content };
+        };
+
         for (let row = 0; row < this.rows; row++) {
             const rowDiv = document.createElement('div');
             rowDiv.className = 'display-row';
 
-            const rowFlaps = [];
-
             for (let col = 0; col < this.cols; col++) {
-                const flapContainer = document.createElement('div');
-                flapContainer.className = 'flap-container';
+                const tileDiv = document.createElement('div');
+                tileDiv.className = 'flap-container';
 
-                const flap = document.createElement('div');
-                flap.className = 'flap';
+                const top = makeFace('flap-top');
+                const bottom = makeFace('flap-bottom');
+                const fallTop = makeFace('flap-top flap-fall');
+                const fallBottom = makeFace('flap-bottom flap-fall');
+                tileDiv.append(top.face, bottom.face, fallTop.face, fallBottom.face);
+                rowDiv.appendChild(tileDiv);
 
-                // Create top half
-                const topHalf = document.createElement('div');
-                topHalf.className = 'flap-half flap-top';
-                const topContent = document.createElement('div');
-                topContent.className = 'flap-content';
-                topContent.textContent = ' ';
-                topHalf.appendChild(topContent);
+                const timing = { duration: FLIP_MS, delay: stagger(row, col), fill: 'both' };
+                const animations = [
+                    fallTop.face.animate(FALL_TOP_KEYFRAMES, timing),
+                    fallBottom.face.animate(FALL_BOTTOM_KEYFRAMES, timing),
+                ];
+                animations.forEach((animation) => animation.finish());
 
-                // Create bottom half
-                const bottomHalf = document.createElement('div');
-                bottomHalf.className = 'flap-half flap-bottom';
-                const bottomContent = document.createElement('div');
-                bottomContent.className = 'flap-content';
-                bottomContent.textContent = ' ';
-                bottomHalf.appendChild(bottomContent);
-
-                flap.appendChild(topHalf);
-                flap.appendChild(bottomHalf);
-                flapContainer.appendChild(flap);
-                rowDiv.appendChild(flapContainer);
-
-                rowFlaps.push({
-                    container: flapContainer,
-                    topContent: topContent,
-                    bottomContent: bottomContent,
-                    currentChar: ' ',
-                    targetChar: ' ',
-                    timeoutId: null,
-                    animationId: 0,
+                this.tiles.push({
+                    top: top.content,
+                    bottom: bottom.content,
+                    fallTop: fallTop.content,
+                    fallBottom: fallBottom.content,
+                    animations,
+                    current: 0, // index into CHARSET
+                    target: 0,
                 });
             }
 
-            this.flaps.push(rowFlaps);
             this.container.appendChild(rowDiv);
         }
     }
@@ -130,106 +122,84 @@ class SplitFlapDisplay {
     setText(text) {
         // layout.js returns exactly this.rows strings of this.cols characters,
         // already uppercased and limited to CHARSET.
-        layoutText(text, this.cols, this.rows).forEach((line, rowIndex) => {
-            Array.from(line).forEach((char, colIndex) => {
-                this.flaps[rowIndex][colIndex].targetChar = char;
-                this.animateFlap(rowIndex, colIndex);
+        layoutText(text, this.cols, this.rows).forEach((line, row) => {
+            Array.from(line).forEach((char, col) => {
+                this.tiles[row * this.cols + col].target = CHARSET.indexOf(char);
             });
         });
+
+        if (document.hidden || this.reducedMotion.matches) {
+            this.snap();
+        } else if (this.frameId === null && this.tiles.some((tile) => tile.current !== tile.target)) {
+            // Backdated one tick so the first flip starts on the next frame.
+            this.lastTickAt = performance.now() - TICK_MS;
+            this.frameId = requestAnimationFrame((now) => this.frame(now));
+        }
     }
 
-    animateFlap(row, col) {
-        const flap = this.flaps[row][col];
+    // The clock. Tiles only ever move on a tick, and a late frame advances them
+    // by every tick it missed, so a slow machine skips steps and a message
+    // still takes the same time to arrive.
+    frame(now) {
+        this.frameId = null;
 
-        // Cancel any existing pending animation step for this flap
-        if (flap.timeoutId !== null) {
-            clearTimeout(flap.timeoutId);
-            flap.timeoutId = null;
+        const steps = Math.floor((now - this.lastTickAt) / TICK_MS);
+        if (steps >= 1) {
+            this.lastTickAt += steps * TICK_MS;
+            this.sound.play(this.advance(steps), TICK_MS / 1000);
         }
 
-        // Remove any leftover flip elements from a previous animation
-        const existingFlips = flap.container.querySelectorAll('.flap-flip');
-        existingFlips.forEach((el) => el.remove());
-
-        // Bump animation id so old sequences know they're obsolete
-        flap.animationId += 1;
-        const animationId = flap.animationId;
-
-        if (flap.currentChar === flap.targetChar) {
-            return; // Already showing the target character
+        if (this.tiles.some((tile) => tile.current !== tile.target)) {
+            this.frameId = requestAnimationFrame((next) => this.frame(next));
         }
-
-        const currentIndex = CHARSET.indexOf(flap.currentChar);
-        const targetIndex = CHARSET.indexOf(flap.targetChar);
-
-        // Calculate the shortest path through the character set
-        let steps = targetIndex - currentIndex;
-        if (steps < 0) {
-            steps += CHARSET.length;
-        }
-
-        this.flipSequence(row, col, steps, 0, animationId);
     }
 
-    flipSequence(row, col, totalSteps, currentStep, animationId) {
-        if (currentStep >= totalSteps) {
-            return;
-        }
+    // Move every unfinished tile up to `steps` characters toward its target and
+    // flip it. Returns how many tiles flipped.
+    advance(steps) {
+        let flipped = 0;
+        for (const tile of this.tiles) {
+            if (tile.current === tile.target) continue;
 
-        const flap = this.flaps[row][col];
+            const remaining = (tile.target - tile.current + CHARSET.length) % CHARSET.length;
+            const oldChar = CHARSET[tile.current];
+            tile.current = (tile.current + Math.min(steps, remaining)) % CHARSET.length;
+            const newChar = CHARSET[tile.current];
 
-        // If a newer animation has started for this flap, abort this sequence
-        if (animationId !== flap.animationId) {
-            return;
-        }
-
-        const currentIndex = CHARSET.indexOf(flap.currentChar);
-        const nextIndex = (currentIndex + 1) % CHARSET.length;
-        const nextChar = CHARSET[nextIndex];
-
-        // Create animated flip element
-        const flipElement = document.createElement('div');
-        flipElement.className = 'flap-flip';
-        const flipContent = document.createElement('div');
-        flipContent.className = 'flap-content';
-        flipContent.textContent = flap.currentChar;
-        flipElement.appendChild(flipContent);
-
-        flap.container.appendChild(flipElement);
-
-        // Play click sound
-        this.playClickSound();
-
-        // Start animation
-        setTimeout(() => {
-            flipElement.classList.add('flipping');
-        }, 10);
-
-        // Update display after animation
-        flap.timeoutId = setTimeout(() => {
-            // If a newer animation has started since this timeout was scheduled, abort
-            if (animationId !== flap.animationId) {
-                // Ensure this flip element doesn't linger on screen
-                flipElement.remove();
-                return;
+            tile.top.textContent = newChar;
+            tile.bottom.textContent = oldChar;
+            tile.fallTop.textContent = oldChar;
+            tile.fallBottom.textContent = newChar;
+            for (const animation of tile.animations) {
+                animation.currentTime = 0;
+                animation.play();
             }
+            flipped++;
+        }
+        return flipped;
+    }
 
-            flap.currentChar = nextChar;
-            flap.topContent.textContent = nextChar;
-            flap.bottomContent.textContent = nextChar;
-            flipElement.remove();
-
-            // Continue sequence
-            this.flipSequence(row, col, totalSteps, currentStep + 1, animationId);
-        }, 100);
+    // Jump to the target with no animation and no sound.
+    snap() {
+        if (this.frameId !== null) {
+            cancelAnimationFrame(this.frameId);
+            this.frameId = null;
+        }
+        for (const tile of this.tiles) {
+            if (tile.current === tile.target) continue;
+            tile.current = tile.target;
+            const char = CHARSET[tile.current];
+            tile.top.textContent = char;
+            tile.bottom.textContent = char;
+            tile.fallTop.textContent = char;
+            tile.fallBottom.textContent = char;
+            tile.animations.forEach((animation) => animation.finish());
+        }
     }
 
     clear() {
-        const emptyText = Array(this.rows).fill('').join('\n');
-        this.setText(emptyText);
+        this.setText('');
     }
 }
 
 export { SplitFlapDisplay };
-
-
