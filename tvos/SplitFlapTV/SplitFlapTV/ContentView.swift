@@ -31,6 +31,20 @@ struct ContentView: View {
     @StateObject private var viewModel = RoomViewModel(roomId: ContentView.initialRoomId)
     @State private var isQRCodeHidden = false
 
+    /// Burn-in guard. The idle timer is off and a message can sit for days, so
+    /// everything on screen drifts a few points around a small circle, one
+    /// step every few minutes, slowly enough that nobody sees it move.
+    @State private var shiftStep = 0
+    private static let shiftRadius: CGFloat = 6
+    private static let shiftSteps = 8
+    private static let shiftInterval: TimeInterval = 180
+    private static let shiftDuration: TimeInterval = 3
+
+    private var burnInOffset: CGSize {
+        let angle = 2 * Double.pi * Double(shiftStep % Self.shiftSteps) / Double(Self.shiftSteps)
+        return CGSize(width: Self.shiftRadius * cos(angle), height: Self.shiftRadius * sin(angle))
+    }
+
     private var effectiveText: String {
         viewModel.state?.text ?? "Scan the QR code to change this message. Press the center of the clickpad on your Apple TV remote to hide the QR code."
     }
@@ -52,23 +66,50 @@ struct ContentView: View {
     private let backgroundColor: Color = .black
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
+        ZStack {
             backgroundColor
                 .ignoresSafeArea()
 
-            // Display board centered on screen.
-            BoardView(
-                config: sampleConfig,
-                message: effectiveText
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            ZStack(alignment: .bottomTrailing) {
+                // Display board centered on screen.
+                BoardView(
+                    config: sampleConfig,
+                    message: effectiveText
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
 
-            // QR code anchored in the bottom-right corner.
-            // We only show it after RoomViewModel has finished auth and
-            // attached the Firestore listener (viewModel.isReady == true).
-            if let controlURLString, !isQRCodeHidden, viewModel.isReady {
-                QRCodeView(text: controlURLString, size: 160)
-                    .padding(60)
+                // QR code anchored in the bottom-right corner.
+                // We only show it after RoomViewModel has finished auth and
+                // attached the Firestore listener (viewModel.isReady == true).
+                if let controlURLString, !isQRCodeHidden, viewModel.isReady {
+                    QRCodeView(text: controlURLString, size: 160)
+                        .padding(60)
+                }
+            }
+            // Connection status, bottom-left, shown only while something has
+            // been wrong for a few seconds (the same line the web display shows).
+            .overlay(alignment: .bottomLeading) {
+                if viewModel.showsReconnecting {
+                    Text("Reconnecting…")
+                        .font(.system(size: 24, weight: .regular))
+                        .textCase(.uppercase)
+                        .kerning(1)
+                        .foregroundColor(.white.opacity(0.9))
+                        .padding(.horizontal, 28)
+                        .padding(.vertical, 14)
+                        .background(Capsule().fill(Color.black.opacity(0.7)))
+                        .padding(60)
+                }
+            }
+            .offset(burnInOffset)
+        }
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: UInt64(Self.shiftInterval * 1_000_000_000))
+                if Task.isCancelled { break }
+                withAnimation(.easeInOut(duration: Self.shiftDuration)) {
+                    shiftStep += 1
+                }
             }
         }
         // On tvOS, treat any remote tap (select press on the focused area)

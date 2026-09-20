@@ -8,11 +8,14 @@ struct QRCodeView: View {
     let text: String
     let size: CGFloat
 
-    private let context = CIContext()
-    private let filter = CIFilter.qrCodeGenerator()
+    /// ContentView's body runs again on every message, and this view with it.
+    /// A CIContext is expensive to make and the image never changes for a
+    /// given text and size, so both are kept. Main thread only.
+    private static let context = CIContext()
+    private static var cache: [String: UIImage] = [:]
 
     var body: some View {
-        if let image = generateQRCode(from: text) {
+        if let image = Self.qrCode(for: text, size: size) {
             Image(uiImage: image)
                 .interpolation(.none)
                 .resizable()
@@ -23,7 +26,11 @@ struct QRCodeView: View {
         }
     }
 
-    private func generateQRCode(from string: String) -> UIImage? {
+    private static func qrCode(for string: String, size: CGFloat) -> UIImage? {
+        let key = "\(size)|\(string)"
+        if let cached = cache[key] { return cached }
+
+        let filter = CIFilter.qrCodeGenerator()
         filter.message = Data(string.utf8)
 
         guard let outputImage = filter.outputImage else {
@@ -35,12 +42,11 @@ struct QRCodeView: View {
         let scaleY = size / outputImage.extent.size.height
         let transformedImage = outputImage.transformed(by: CGAffineTransform(scaleX: scaleX, y: scaleY))
 
-        if let cgImage = context.createCGImage(transformedImage, from: transformedImage.extent) {
-            return UIImage(cgImage: cgImage)
+        guard let cgImage = context.createCGImage(transformedImage, from: transformedImage.extent) else {
+            return nil
         }
-
-        return nil
+        let image = UIImage(cgImage: cgImage)
+        cache[key] = image
+        return image
     }
 }
-
-

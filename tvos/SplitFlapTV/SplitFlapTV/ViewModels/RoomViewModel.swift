@@ -3,117 +3,117 @@ import Combine
 import FirebaseAuth
 import FirebaseFirestore
 
-/// Observable view model that mirrors the web client's Firestore behavior:
-/// - Ensures an anonymous signed-in user.
-/// - Listens to rooms/{roomId}.
-/// - Publishes RoomState when the document changes.
-/// - Proactively refreshes auth token before expiry.
-/// - Health checks to detect connection failures and auto-reconnect.
+/// Observable view model that mirrors the web display's Firestore behavior
+/// (web/display.js):
+/// - Signs in anonymously, retrying with backoff for as long as it takes.
+/// - Keeps one listener on rooms/{roomId} for the life of the app. The SDK
+///   reconnects it and refreshes the auth token by itself.
+/// - Publishes RoomState when the document's message changes.
+/// - Takes its connection state from snapshot metadata alone.
+///
+/// Until 1.2 this file also ran a 5-minute health check, a 55-minute token
+/// refresh, and a sign-out-and-recreate "reconnect". None of it was needed (see
+/// docs/AUDIT_2026-09.md), the health check could tear down a healthy listener,
+/// and every forced re-auth made a new anonymous account. Never sign out to
+/// "fix" a connection.
 /// Debug logging lives in DebugLog.swift (timestamped, DEBUG builds only).
 
 final class RoomViewModel: ObservableObject {
     @Published var state: RoomState?
-    @Published var errorMessage: String?
     /// Becomes true after authentication succeeds, allowing the UI to display
     /// the QR code immediately without waiting for Firestore connectivity.
     @Published var isReady: Bool = false
-    /// Indicates whether we have an active connection to Firestore.
-    @Published var isConnected: Bool = true
+    /// True once trouble has lasted `troubleDelay`, so a normal launch or a
+    /// brief blip never shows the "Reconnecting" line.
+    @Published var showsReconnecting: Bool = false
 
     let roomId: String
 
     // MARK: - Connection Management
 
     private var listener: ListenerRegistration?
-    private var healthCheckTimer: Timer?
-    private var tokenRefreshTimer: Timer?
+    private var signInFailures = 0
+    private var listenerFailures = 0
+    private var troubleTimer: DispatchWorkItem?
 
-    private let healthCheckInterval: TimeInterval = 5 * 60 // 5 minutes
-    private let tokenRefreshInterval: TimeInterval = 55 * 60 // 55 minutes
-    private let offlineThreshold: TimeInterval = 60 // 60 seconds
+    private static let troubleDelay: TimeInterval = 5
 
-    private var lastServerResponseTime: Date = Date()
-    private var isReconnecting: Bool = false
+    /// Retry delays: 1 s, 2 s, 4 s, ... capped at a minute (as on the web).
+    private static func backoff(_ attempt: Int) -> TimeInterval {
+        min(60, pow(2, Double(min(attempt, 6))))
+    }
 
     // MARK: - Initialization
 
     init(roomId: String) {
         self.roomId = roomId
-        ensureSignedIn { [weak self] in
-            self?.startListening()
-            self?.startHealthCheck()
-            self?.startTokenRefresh()
-        }
+        signIn()
     }
 
     deinit {
         listener?.remove()
-        healthCheckTimer?.invalidate()
-        tokenRefreshTimer?.invalidate()
+        troubleTimer?.cancel()
     }
 
     // MARK: - Authentication
 
-    private func ensureSignedIn(completion: @escaping () -> Void) {
-        let auth = Auth.auth()
-
-        if auth.currentUser != nil {
-            completion()
-            return
-        }
-
-        auth.signInAnonymously { [weak self] _, error in
+    /// Anonymous auth, so Firestore rules allow the read. signInAnonymously
+    /// returns the persisted user when the device already has one.
+    private func signIn() {
+        Auth.auth().signInAnonymously { [weak self] _, error in
             DispatchQueue.main.async {
+                guard let self = self else { return }
                 if let error = error {
-                    self?.errorMessage = "Auth error: \(error.localizedDescription)"
-                } else {
-                    completion()
+                    let delay = Self.backoff(self.signInFailures)
+                    self.signInFailures += 1
+                    debugLog("[AUTH] sign-in failed, retrying in \(Int(delay))s: \(error.localizedDescription)")
+                    self.setTrouble(true)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                        self?.signIn()
+                    }
+                    return
                 }
+                self.signInFailures = 0
+                // The QR code only needs the roomId, not Firestore connectivity.
+                self.isReady = true
+                self.startListening()
             }
         }
     }
 
-    private func forceReauthenticate(completion: @escaping () -> Void) {
-        let auth = Auth.auth()
+    // MARK: - Connection status
 
-        debugLog("[RECONNECT] Force re-authenticating (sign out + sign in)...")
-
-        // Sign out first
-        do {
-            try auth.signOut()
-            debugLog("[RECONNECT] Signed out successfully")
-        } catch {
-            debugLog("[RECONNECT] Sign out failed (may already be signed out): \(error.localizedDescription)")
-        }
-
-        // Sign in fresh
-        auth.signInAnonymously { [weak self] _, error in
-            DispatchQueue.main.async {
-                if let error = error {
-                    debugLog("[RECONNECT] Re-auth failed: \(error.localizedDescription)")
-                    self?.errorMessage = "Re-auth error: \(error.localizedDescription)"
-                    self?.isReconnecting = false
-                } else {
-                    debugLog("[RECONNECT] Re-authentication successful")
-                    completion()
-                }
+    private func setTrouble(_ trouble: Bool) {
+        if !trouble {
+            troubleTimer?.cancel()
+            troubleTimer = nil
+            if showsReconnecting {
+                debugLog("[STATE] Connection restored")
+                showsReconnecting = false
             }
+            return
         }
+        guard troubleTimer == nil, !showsReconnecting else { return }
+        let timer = DispatchWorkItem { [weak self] in
+            self?.troubleTimer = nil
+            self?.showsReconnecting = true
+        }
+        troubleTimer = timer
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.troubleDelay, execute: timer)
     }
 
     // MARK: - Firestore Listener
 
     private func startListening() {
-        // Mark as ready immediately after auth succeeds - the QR code only
-        // needs the roomId, not Firestore connectivity.
-        isReady = true
-
         let db = Firestore.firestore()
 
         debugLog("[LISTENER] Setting up Firestore listener for room: \(roomId)")
 
+        // Metadata changes are included because isFromCache is the connection
+        // signal: it turns true when the SDK loses the server and false when it
+        // is back, so the status always clears.
         listener = db.collection("rooms").document(roomId)
-            .addSnapshotListener { [weak self] snapshot, error in
+            .addSnapshotListener(includeMetadataChanges: true) { [weak self] snapshot, error in
                 // Timestamp on Firestore's callback queue, BEFORE hopping to
                 // main: a gap between this line and the "main hop" line below
                 // means the main thread was busy, not the network.
@@ -134,39 +134,44 @@ final class RoomViewModel: ObservableObject {
                     let hopMs = Int(Date().timeIntervalSince(receivedAt) * 1000)
                     debugLog("[SNAPSHOT] main-thread hop took \(hopMs)ms")
 
+                    // A listener error (rules, a revoked user) ends the
+                    // listener, so resubscribe with capped backoff.
                     if let error = error {
-                        debugLog("[ERROR] Snapshot listener error: \(error.localizedDescription)")
-                        self.errorMessage = "Listen error: \(error.localizedDescription)"
-                        self.handleConnectionFailure()
-                        return
-                    }
-
-                    // Track connection state via metadata
-                    if let snapshot = snapshot {
-                        if !snapshot.metadata.isFromCache {
-                            self.lastServerResponseTime = Date()
-                            if !self.isConnected {
-                                debugLog("[STATE] Connection restored")
-                            }
-                            self.isConnected = true
-                            debugLog("[SNAPSHOT] Server response - updating lastServerResponseTime")
-                        } else {
-                            debugLog("[SNAPSHOT] Cache response - NOT updating lastServerResponseTime")
+                        let delay = Self.backoff(self.listenerFailures)
+                        self.listenerFailures += 1
+                        debugLog("[ERROR] Snapshot listener error, resubscribing in \(Int(delay))s: \(error.localizedDescription)")
+                        self.setTrouble(true)
+                        self.listener?.remove()
+                        self.listener = nil
+                        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                            self?.startListening()
                         }
-                    }
-
-                    guard let data = snapshot?.data(),
-                          let text = data["text"] as? String
-                    else {
-                        // No doc or no text field; leave state unchanged.
                         return
                     }
+
+                    guard let snapshot = snapshot else { return }
+
+                    if snapshot.metadata.isFromCache {
+                        self.setTrouble(true)
+                    } else {
+                        self.listenerFailures = 0
+                        self.setTrouble(false)
+                    }
+
+                    // The room document doesn't exist until a remote first
+                    // writes to it; leave state unchanged.
+                    guard let data = snapshot.data(),
+                          let text = data["text"] as? String
+                    else { return }
 
                     let source = data["source"] as? String
-                    var updatedAt: Date?
+                    let updatedAt = (data["updatedAt"] as? Timestamp)?.dateValue()
 
-                    if let ts = data["updatedAt"] as? Timestamp {
-                        updatedAt = ts.dateValue()
+                    // A metadata-only snapshot repeats the message we already
+                    // have. Don't publish it again.
+                    if let current = self.state,
+                       current.text == text, current.source == source, current.updatedAt == updatedAt {
+                        return
                     }
 
                     self.state = RoomState(text: text, source: source, updatedAt: updatedAt)
@@ -185,107 +190,11 @@ final class RoomViewModel: ObservableObject {
                             "serverAgeMs": serverAgeMs,
                             "hopMs": hopMs,
                             "receivedAt": receivedAt,
-                            "pendingWrites": snapshot?.metadata.hasPendingWrites ?? false,
+                            "pendingWrites": snapshot.metadata.hasPendingWrites,
                         ]
                     )
                     #endif
                 }
             }
-    }
-
-    // MARK: - Health Check
-
-    private func startHealthCheck() {
-        debugLog("[HEALTH] Starting health check interval (every 5 min)")
-        healthCheckTimer = Timer.scheduledTimer(withTimeInterval: healthCheckInterval, repeats: true) { [weak self] _ in
-            self?.performHealthCheck()
-        }
-    }
-
-    private func performHealthCheck() {
-        let timeSinceLastResponse = Date().timeIntervalSince(lastServerResponseTime)
-        debugLog("[HEALTH] Health check tick - performing active ping (last response: \(Int(timeSinceLastResponse))s ago)")
-
-        let db = Firestore.firestore()
-        db.collection("rooms").document(roomId).getDocument { [weak self] snapshot, error in
-            guard let self = self else { return }
-
-            DispatchQueue.main.async {
-                if let error = error {
-                    debugLog("[HEALTH] Ping failed: \(error.localizedDescription)")
-                    let elapsed = Date().timeIntervalSince(self.lastServerResponseTime)
-                    if elapsed > self.offlineThreshold {
-                        self.handleConnectionFailure()
-                    }
-                    return
-                }
-
-                if snapshot?.metadata.isFromCache == false {
-                    self.lastServerResponseTime = Date()
-                    self.isConnected = true
-                    debugLog("[HEALTH] Ping successful - connection confirmed alive")
-                } else {
-                    debugLog("[HEALTH] Ping returned cached data - checking threshold")
-                    let elapsed = Date().timeIntervalSince(self.lastServerResponseTime)
-                    if elapsed > self.offlineThreshold {
-                        debugLog("[HEALTH] Over threshold (\(Int(elapsed))s > \(Int(self.offlineThreshold))s) - attempting reconnect")
-                        self.handleConnectionFailure()
-                    }
-                }
-            }
-        }
-    }
-
-    // MARK: - Token Refresh
-
-    private func startTokenRefresh() {
-        debugLog("[TOKEN] Starting proactive token refresh interval (every 55 min)")
-        tokenRefreshTimer = Timer.scheduledTimer(withTimeInterval: tokenRefreshInterval, repeats: true) { [weak self] _ in
-            self?.refreshAuthToken()
-        }
-    }
-
-    private func refreshAuthToken() {
-        guard let user = Auth.auth().currentUser else {
-            debugLog("[TOKEN] No current user - skipping refresh")
-            return
-        }
-
-        debugLog("[TOKEN] Proactively refreshing auth token before expiry")
-        user.getIDTokenForcingRefresh(true) { token, error in
-            if let error = error {
-                debugLog("[TOKEN] Refresh failed: \(error.localizedDescription)")
-            } else {
-                debugLog("[TOKEN] Auth token refreshed successfully")
-            }
-        }
-    }
-
-    // MARK: - Connection Failure Handling
-
-    private func handleConnectionFailure() {
-        guard !isReconnecting else {
-            debugLog("[RECONNECT] Already reconnecting, skipping")
-            return
-        }
-
-        isReconnecting = true
-        isConnected = false
-
-        debugLog("[RECONNECT] Attempting full reconnect - teardown and rebuild listener")
-
-        // Remove existing listener
-        if listener != nil {
-            debugLog("[RECONNECT] Unsubscribing existing listener")
-            listener?.remove()
-            listener = nil
-        }
-
-        // Force re-authenticate and rebuild listener
-        forceReauthenticate { [weak self] in
-            debugLog("[RECONNECT] Setting up new Firestore listener")
-            self?.startListening()
-            self?.isReconnecting = false
-        }
     }
 }

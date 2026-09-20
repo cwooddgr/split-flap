@@ -88,8 +88,18 @@ struct BoardView: View {
             // text-heavy canvas in hundreds of ms) from starving the main
             // dispatch queue — without it, Firestore delivery and every other
             // main.async block queued behind rendering for seconds.
+            //
+            // The renderer closure may run off the main thread, so it must not
+            // read @State through self. Everything it needs is copied here, on
+            // the main thread, and the drawing functions are static.
+            let frame = BoardFrame(
+                current: currentBoard,
+                previous: previousBoard,
+                tickDate: tickDate,
+                glyphs: glyphCache
+            )
             Canvas(rendersAsynchronously: true) { context, _ in
-                drawBoard(in: &context, now: timeline.date)
+                Self.drawBoard(in: &context, now: timeline.date, frame: frame)
             }
             .frame(
                 width: Metrics.boardSize(for: config).width,
@@ -122,13 +132,21 @@ struct BoardView: View {
         return Double(hash) / 977.0 * maxStagger
     }
 
-    private func drawBoard(in context: inout GraphicsContext, now: Date) {
-        guard !currentBoard.isEmpty, !glyphCache.isEmpty else { return }
+    /// What one frame draws: a copy of the board state, taken on the main thread.
+    struct BoardFrame {
+        let current: [[Character]]
+        let previous: [[Character]]
+        let tickDate: Date
+        let glyphs: [Character: TileHalves]
+    }
 
-        let elapsed = now.timeIntervalSince(tickDate)
+    private static func drawBoard(in context: inout GraphicsContext, now: Date, frame: BoardFrame) {
+        guard !frame.current.isEmpty, !frame.glyphs.isEmpty else { return }
 
-        for row in 0..<currentBoard.count {
-            for col in 0..<currentBoard[row].count {
+        let elapsed = now.timeIntervalSince(frame.tickDate)
+
+        for row in 0..<frame.current.count {
+            for col in 0..<frame.current[row].count {
                 let rect = CGRect(
                     x: CGFloat(col) * (Metrics.tileWidth + Metrics.hSpacing),
                     y: CGFloat(row) * (Metrics.tileHeight + Metrics.vSpacing),
@@ -136,24 +154,24 @@ struct BoardView: View {
                     height: Metrics.tileHeight
                 )
 
-                let current = currentBoard[row][col]
-                let previous = row < previousBoard.count && col < previousBoard[row].count
-                    ? previousBoard[row][col] : current
+                let current = frame.current[row][col]
+                let previous = row < frame.previous.count && col < frame.previous[row].count
+                    ? frame.previous[row][col] : current
 
                 var progress = 1.0
                 if previous != current {
-                    let start = Self.stagger(row: row, col: col)
-                    progress = min(max((elapsed - start) / Self.flipDuration, 0), 1)
+                    let start = stagger(row: row, col: col)
+                    progress = min(max((elapsed - start) / flipDuration, 0), 1)
                 }
 
-                guard let currentHalves = glyphCache[current] else { continue }
+                guard let currentHalves = frame.glyphs[current] else { continue }
 
                 if progress >= 1 {
                     drawStaticTile(in: &context, rect: rect, halves: currentHalves)
                 } else {
                     drawFlippingTile(
                         in: &context, rect: rect,
-                        old: glyphCache[previous] ?? currentHalves,
+                        old: frame.glyphs[previous] ?? currentHalves,
                         new: currentHalves,
                         progress: progress
                     )
@@ -164,7 +182,7 @@ struct BoardView: View {
 
     /// Tile at rest: two cached half images, nothing else. Backgrounds,
     /// rounded corners, glyph, and split line are all baked into the images.
-    private func drawStaticTile(
+    private static func drawStaticTile(
         in context: inout GraphicsContext,
         rect: CGRect,
         halves: TileHalves
@@ -179,7 +197,7 @@ struct BoardView: View {
     /// the old top half down (scale 1→0), then the new bottom half onward
     /// (scale 0→1) to cover the old bottom half. Gravity easing (p²) so the
     /// flap accelerates into the clack.
-    private func drawFlippingTile(
+    private static func drawFlippingTile(
         in context: inout GraphicsContext,
         rect: CGRect,
         old: TileHalves,

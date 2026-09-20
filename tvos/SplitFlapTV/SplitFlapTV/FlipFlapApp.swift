@@ -13,6 +13,12 @@ struct FlipFlapApp: App {
         FirebaseConfiguration.shared.setLoggerLevel(.debug)
         #endif
         FirebaseApp.configure()
+        // Memory-only cache. A room is never opened again after the app quits,
+        // so a disk cache only collects documents nothing will read. This has
+        // to be set before anything else touches Firestore.
+        let settings = FirestoreSettings()
+        settings.cacheSettings = MemoryCacheSettings()
+        Firestore.firestore().settings = settings
         #if DEBUG
         Firestore.enableLogging(true)
         MainThreadWatchdog.shared.start()
