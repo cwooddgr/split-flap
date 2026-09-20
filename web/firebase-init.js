@@ -5,6 +5,8 @@ import {
     initializeFirestore,
     doc,
     onSnapshot,
+    setDoc,
+    serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
 import { app, ensureSignedIn, backoffMs } from './firebase-core.js';
 
@@ -17,4 +19,7 @@ import { app, ensureSignedIn, backoffMs } from './firebase-core.js';
 // repeating that test in Safari.
 const db = initializeFirestore(app, { experimentalForceLongPolling: true });
 
-export { db, doc, onSnapshot, ensureSignedIn, backoffMs };
+// setDoc and serverTimestamp are here only for a phone that still has the
+// 2026-09-20 control.js in its cache, which imported them from this file. The
+// display doesn't use them. Safe to drop after a day.
+export { db, doc, onSnapshot, setDoc, serverTimestamp, ensureSignedIn, backoffMs };
