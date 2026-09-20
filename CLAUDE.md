@@ -61,7 +61,8 @@ Firebase SDK is managed via Swift Package Manager (configured in the Xcode proje
 ## Key Files
 
 ### Web App
-- `splitflap.js` - Core `SplitFlapDisplay` class: rendering engine, animation loop, layout, sound
+- `layout.js` - Pure layout: `CHARSET` and `layoutText(text, cols, rows)`, no DOM. The spec for it is `shared/layout-fixtures.json`
+- `splitflap.js` - Core `SplitFlapDisplay` class: rendering engine, animation loop, sound (layout comes from `layout.js`)
 - `display.js` - Display page: room creation, Firebase `onSnapshot` listener, QR code
 - `control.js` - Remote page: text input, preset quotes, Firebase writes
 - `firebase-init.js` - Firebase config, initialization, auth helpers (shared by display + control)
@@ -69,8 +70,9 @@ Firebase SDK is managed via Swift Package Manager (configured in the Xcode proje
 ### tvOS App (`tvos/SplitFlapTV/SplitFlapTV/`)
 - `ContentView.swift` - Root view: room ID generation, QR code toggle, board container
 - `ViewModels/RoomViewModel.swift` - Firebase subscription, anonymous auth, room state
-- `Views/BoardView.swift` - The whole board as one `Canvas` inside a `TimelineView`, drawn from a cache of pre-rendered glyph half-images, plus the animation coordinator and `CHARSET` (all in one file; there is no per-tile view since 1.1)
-- `Views/BoardLayout.swift` - Word-wrap and centering logic (Swift port of `splitflap.js`)
+- `Views/BoardView.swift` - The whole board as one `Canvas` inside a `TimelineView`, drawn from a cache of pre-rendered glyph half-images, plus the animation coordinator (all in one file; there is no per-tile view since 1.1)
+- `Layout/BoardLayout.swift` - Word-wrap and centering logic (Swift port of `layout.js`)
+- `Layout/BoardCharset.swift` - The 73-character charset and the one-step `advance`. The `Layout/` folder has no UI imports, so `tvos/Package.swift` can build it alone for tests
 - `Views/QRCodeView.swift` - QR code rendering via CoreImage
 - `Models/RoomState.swift` - `BoardConfig` and `RoomState` structs
 - `SoundEffects.swift` - `FlipSoundPlayer`: 12 recorded clack samples (`Sounds/*.caf`) through a pool of `AVAudioPlayerNode`s on one `AVAudioEngine`, with random gain and jitter per tick
@@ -86,22 +88,23 @@ The two platforms use different grid sizes:
 - **Web**: 21 columns × 6 rows (in `display.js`: `new SplitFlapDisplay('displayBoard', 21, 6)`)
 - **tvOS**: 21 columns × 8 rows (in `ContentView.swift`: `BoardConfig(cols: 21, rows: 8)`)
 
-Both use the same layout algorithm (word-wrap, center) and the same 73-character `CHARSET` constant (counted in both files 2026-09-19; docs said 74 until then).
+Both use the same layout algorithm (word-wrap, center) and the same 73-character charset (`CHARSET` in `layout.js`, `BoardCharset` in Swift; docs said 74 until 2026-09-19).
 
-A message with more lines than the board has rows loses the extra lines without warning. On web that is `lines.slice(0, this.rows)` in `splitflap.js`, so a 7-line message that fits tvOS drops its last line on web. The remote has no preview and does not know which board size it is writing to.
+A message with more lines than the board has rows loses the extra lines without warning. So a 7-line message that fits tvOS drops its last line on web. The remote has no preview and does not know which board size it is writing to.
 
 ## Layout Algorithm
 
-Both web and tvOS implement the same layout, as two hand ports with no shared tests:
-1. Split text on `\n` into logical lines
-2. Word-wrap each line at spaces to fit 21 columns
-3. Horizontally center based on widest line
-4. Vertically center within available rows
-5. All text is uppercased, and any character outside `CHARSET` becomes a space
+Both web and tvOS implement the same layout, as two hand ports held together by one spec. `shared/layout-fixtures.json` lists input text, board size, and the exact expected rows; `node --test tests/layout.test.mjs` and `cd tvos && swift test` both run it, and `.github/workflows/tests.yml` runs both on every push. **To change layout behavior, change or add a fixture first, then make both ports pass.** The steps:
+1. Sanitize before measuring: CRLF and CR become `\n`, accents fold to the base letter (NFD, then drop U+0300–U+036F), uppercase (so `ß` is already `SS` when it's measured), and every code point outside the charset becomes a space
+2. Split text on `\n` into logical lines
+3. Word-wrap each line at spaces to fit 21 columns. Runs of spaces inside a line are kept; a word longer than the board is broken across lines (it used to be cut off, which ate URLs)
+4. Drop lines past the last row
+5. Horizontally center based on widest line; lines stay left-justified in the block
+6. Vertically center within available rows; an odd spare row goes below
 
-Known divergence between the ports (found 2026-09-19 by running both algorithms on the same input, not yet fixed): on a line that needs wrapping, the Swift port turns each empty token from `split(" ")` into a space and then adds the joiner space too, so a double space becomes a triple space on tvOS and the wrap point can move. The JS port keeps double spaces as typed. Both ports uppercase after wrapping, so `ß` → `SS` can overflow a line and get cut.
+History: until 2026-09-20 the ports disagreed (the Swift one turned a double space into a triple space on a wrapping line, and both uppercased after wrapping so `ß` could overflow). The shipped tvOS 1.1 still has the old Swift layout; the new one ships with 1.2. The web display got the new layout the day it was pushed.
 
-Character set: Space, A-Z, 0-9, common punctuation, smart quotes, degree symbol, dashes (73 chars total, defined in `CHARSET` in both `splitflap.js` and `BoardView.swift`).
+Character set: Space, A-Z, 0-9, common punctuation, smart quotes, degree symbol, dashes (73 chars total, defined in `layout.js` and `Layout/BoardCharset.swift`; the tests check both against the fixture file).
 
 ## tvOS Animation Architecture
 

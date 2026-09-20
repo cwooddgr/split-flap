@@ -1,0 +1,827 @@
+{
+  "about": "Shared spec for board layout. layout.js (web) and BoardLayout.swift (tvOS) must both produce `expected` for every case, and both must use exactly `charset`. To change behavior, change or add a case here first, then make both ports pass. Run: node --test tests/layout.test.mjs and (cd tvos && swift test).",
+  "charset": " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.:!?-,;'\"()/@#$%&*+=<>[]{}|~‘’“”°–—…",
+  "cases": [
+    {
+      "name": "empty message (21x6)",
+      "text": "",
+      "cols": 21,
+      "rows": 6,
+      "expected": [
+        "                     ",
+        "                     ",
+        "                     ",
+        "                     ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "empty message (21x8)",
+      "text": "",
+      "cols": 21,
+      "rows": 8,
+      "expected": [
+        "                     ",
+        "                     ",
+        "                     ",
+        "                     ",
+        "                     ",
+        "                     ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "one word (21x6)",
+      "text": "hello",
+      "cols": 21,
+      "rows": 6,
+      "expected": [
+        "                     ",
+        "                     ",
+        "        HELLO        ",
+        "                     ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "one word (21x8)",
+      "text": "hello",
+      "cols": 21,
+      "rows": 8,
+      "expected": [
+        "                     ",
+        "                     ",
+        "                     ",
+        "        HELLO        ",
+        "                     ",
+        "                     ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "short line is centered (21x6)",
+      "text": "HELLO WORLD",
+      "cols": 21,
+      "rows": 6,
+      "expected": [
+        "                     ",
+        "                     ",
+        "     HELLO WORLD     ",
+        "                     ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "short line is centered (21x8)",
+      "text": "HELLO WORLD",
+      "cols": 21,
+      "rows": 8,
+      "expected": [
+        "                     ",
+        "                     ",
+        "                     ",
+        "     HELLO WORLD     ",
+        "                     ",
+        "                     ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "line of exactly 21 columns (21x6)",
+      "text": "ABCDEFGHIJKLMNOPQRSTU",
+      "cols": 21,
+      "rows": 6,
+      "expected": [
+        "                     ",
+        "                     ",
+        "ABCDEFGHIJKLMNOPQRSTU",
+        "                     ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "line of exactly 21 columns (21x8)",
+      "text": "ABCDEFGHIJKLMNOPQRSTU",
+      "cols": 21,
+      "rows": 8,
+      "expected": [
+        "                     ",
+        "                     ",
+        "                     ",
+        "ABCDEFGHIJKLMNOPQRSTU",
+        "                     ",
+        "                     ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "wraps at a space (21x6)",
+      "text": "THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG",
+      "cols": 21,
+      "rows": 6,
+      "expected": [
+        "                     ",
+        " THE QUICK BROWN FOX ",
+        " JUMPS OVER THE LAZY ",
+        " DOG                 ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "wraps at a space (21x8)",
+      "text": "THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG",
+      "cols": 21,
+      "rows": 8,
+      "expected": [
+        "                     ",
+        "                     ",
+        " THE QUICK BROWN FOX ",
+        " JUMPS OVER THE LAZY ",
+        " DOG                 ",
+        "                     ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "lines stay left-justified inside the centered block (21x6)",
+      "text": "A LONG FIRST LINE HERE\nSHORT",
+      "cols": 21,
+      "rows": 6,
+      "expected": [
+        "                     ",
+        "  A LONG FIRST LINE  ",
+        "  HERE               ",
+        "  SHORT              ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "lines stay left-justified inside the centered block (21x8)",
+      "text": "A LONG FIRST LINE HERE\nSHORT",
+      "cols": 21,
+      "rows": 8,
+      "expected": [
+        "                     ",
+        "                     ",
+        "  A LONG FIRST LINE  ",
+        "  HERE               ",
+        "  SHORT              ",
+        "                     ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "explicit newlines (21x6)",
+      "text": "ONE\nTWO\nTHREE",
+      "cols": 21,
+      "rows": 6,
+      "expected": [
+        "                     ",
+        "        ONE          ",
+        "        TWO          ",
+        "        THREE        ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "explicit newlines (21x8)",
+      "text": "ONE\nTWO\nTHREE",
+      "cols": 21,
+      "rows": 8,
+      "expected": [
+        "                     ",
+        "                     ",
+        "        ONE          ",
+        "        TWO          ",
+        "        THREE        ",
+        "                     ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "blank line between lines is kept (21x6)",
+      "text": "ABOVE\n\nBELOW",
+      "cols": 21,
+      "rows": 6,
+      "expected": [
+        "                     ",
+        "        ABOVE        ",
+        "                     ",
+        "        BELOW        ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "blank line between lines is kept (21x8)",
+      "text": "ABOVE\n\nBELOW",
+      "cols": 21,
+      "rows": 8,
+      "expected": [
+        "                     ",
+        "                     ",
+        "        ABOVE        ",
+        "                     ",
+        "        BELOW        ",
+        "                     ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "odd spare row goes below (21x6)",
+      "text": "A\nB\nC",
+      "cols": 21,
+      "rows": 6,
+      "expected": [
+        "                     ",
+        "          A          ",
+        "          B          ",
+        "          C          ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "odd spare row goes below (21x8)",
+      "text": "A\nB\nC",
+      "cols": 21,
+      "rows": 8,
+      "expected": [
+        "                     ",
+        "                     ",
+        "          A          ",
+        "          B          ",
+        "          C          ",
+        "                     ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "more lines than rows: the extra lines are dropped (21x6)",
+      "text": "L1\nL2\nL3\nL4\nL5\nL6\nL7\nL8\nL9",
+      "cols": 21,
+      "rows": 6,
+      "expected": [
+        "         L1          ",
+        "         L2          ",
+        "         L3          ",
+        "         L4          ",
+        "         L5          ",
+        "         L6          "
+      ]
+    },
+    {
+      "name": "more lines than rows: the extra lines are dropped (21x8)",
+      "text": "L1\nL2\nL3\nL4\nL5\nL6\nL7\nL8\nL9",
+      "cols": 21,
+      "rows": 8,
+      "expected": [
+        "         L1          ",
+        "         L2          ",
+        "         L3          ",
+        "         L4          ",
+        "         L5          ",
+        "         L6          ",
+        "         L7          ",
+        "         L8          "
+      ]
+    },
+    {
+      "name": "seven lines: fits 8 rows, loses the last on 6 (21x6)",
+      "text": "L1\nL2\nL3\nL4\nL5\nL6\nL7",
+      "cols": 21,
+      "rows": 6,
+      "expected": [
+        "         L1          ",
+        "         L2          ",
+        "         L3          ",
+        "         L4          ",
+        "         L5          ",
+        "         L6          "
+      ]
+    },
+    {
+      "name": "seven lines: fits 8 rows, loses the last on 6 (21x8)",
+      "text": "L1\nL2\nL3\nL4\nL5\nL6\nL7",
+      "cols": 21,
+      "rows": 8,
+      "expected": [
+        "         L1          ",
+        "         L2          ",
+        "         L3          ",
+        "         L4          ",
+        "         L5          ",
+        "         L6          ",
+        "         L7          ",
+        "                     "
+      ]
+    },
+    {
+      "name": "double space kept on a line that wraps (21x6)",
+      "text": "END OF SENTENCE.  TWO SPACES AFTER PERIOD",
+      "cols": 21,
+      "rows": 6,
+      "expected": [
+        "                     ",
+        "                     ",
+        "END OF SENTENCE.  TWO",
+        "SPACES AFTER PERIOD  ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "double space kept on a line that wraps (21x8)",
+      "text": "END OF SENTENCE.  TWO SPACES AFTER PERIOD",
+      "cols": 21,
+      "rows": 8,
+      "expected": [
+        "                     ",
+        "                     ",
+        "                     ",
+        "END OF SENTENCE.  TWO",
+        "SPACES AFTER PERIOD  ",
+        "                     ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "double spaces kept on a line that wraps (columns) (21x6)",
+      "text": "GATE  B12  NOW BOARDING FLIGHT 7",
+      "cols": 21,
+      "rows": 6,
+      "expected": [
+        "                     ",
+        "                     ",
+        "  GATE  B12  NOW     ",
+        "  BOARDING FLIGHT 7  ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "double spaces kept on a line that wraps (columns) (21x8)",
+      "text": "GATE  B12  NOW BOARDING FLIGHT 7",
+      "cols": 21,
+      "rows": 8,
+      "expected": [
+        "                     ",
+        "                     ",
+        "                     ",
+        "  GATE  B12  NOW     ",
+        "  BOARDING FLIGHT 7  ",
+        "                     ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "leading spaces kept on a line that fits (21x6)",
+      "text": "   INDENTED",
+      "cols": 21,
+      "rows": 6,
+      "expected": [
+        "                     ",
+        "                     ",
+        "        INDENTED     ",
+        "                     ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "leading spaces kept on a line that fits (21x8)",
+      "text": "   INDENTED",
+      "cols": 21,
+      "rows": 8,
+      "expected": [
+        "                     ",
+        "                     ",
+        "                     ",
+        "        INDENTED     ",
+        "                     ",
+        "                     ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "leading spaces dropped on a line that wraps (21x6)",
+      "text": "  THE QUICK BROWN FOX JUMPS OVER",
+      "cols": 21,
+      "rows": 6,
+      "expected": [
+        "                     ",
+        "                     ",
+        " THE QUICK BROWN FOX ",
+        " JUMPS OVER          ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "leading spaces dropped on a line that wraps (21x8)",
+      "text": "  THE QUICK BROWN FOX JUMPS OVER",
+      "cols": 21,
+      "rows": 8,
+      "expected": [
+        "                     ",
+        "                     ",
+        "                     ",
+        " THE QUICK BROWN FOX ",
+        " JUMPS OVER          ",
+        "                     ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "trailing spaces ignored (21x6)",
+      "text": "TRAILING      ",
+      "cols": 21,
+      "rows": 6,
+      "expected": [
+        "                     ",
+        "                     ",
+        "      TRAILING       ",
+        "                     ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "trailing spaces ignored (21x8)",
+      "text": "TRAILING      ",
+      "cols": 21,
+      "rows": 8,
+      "expected": [
+        "                     ",
+        "                     ",
+        "                     ",
+        "      TRAILING       ",
+        "                     ",
+        "                     ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "word longer than the board is broken, not cut (21x6)",
+      "text": "SEE HTTPS://FLIPFLAP.DGRLABS.CO/CONTROL.HTML TODAY",
+      "cols": 21,
+      "rows": 6,
+      "expected": [
+        "                     ",
+        "SEE                  ",
+        "HTTPS://FLIPFLAP.DGRL",
+        "ABS.CO/CONTROL.HTML  ",
+        "TODAY                ",
+        "                     "
+      ]
+    },
+    {
+      "name": "word longer than the board is broken, not cut (21x8)",
+      "text": "SEE HTTPS://FLIPFLAP.DGRLABS.CO/CONTROL.HTML TODAY",
+      "cols": 21,
+      "rows": 8,
+      "expected": [
+        "                     ",
+        "                     ",
+        "SEE                  ",
+        "HTTPS://FLIPFLAP.DGRL",
+        "ABS.CO/CONTROL.HTML  ",
+        "TODAY                ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "word of exactly 42 columns (21x6)",
+      "text": "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEF",
+      "cols": 21,
+      "rows": 6,
+      "expected": [
+        "                     ",
+        "                     ",
+        "ABCDEFGHIJKLMNOPQRSTU",
+        "VWXYZ0123456789ABCDEF",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "word of exactly 42 columns (21x8)",
+      "text": "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEF",
+      "cols": 21,
+      "rows": 8,
+      "expected": [
+        "                     ",
+        "                     ",
+        "                     ",
+        "ABCDEFGHIJKLMNOPQRSTU",
+        "VWXYZ0123456789ABCDEF",
+        "                     ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "lowercase is uppercased (21x6)",
+      "text": "mixed Case text",
+      "cols": 21,
+      "rows": 6,
+      "expected": [
+        "                     ",
+        "                     ",
+        "   MIXED CASE TEXT   ",
+        "                     ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "lowercase is uppercased (21x8)",
+      "text": "mixed Case text",
+      "cols": 21,
+      "rows": 8,
+      "expected": [
+        "                     ",
+        "                     ",
+        "                     ",
+        "   MIXED CASE TEXT   ",
+        "                     ",
+        "                     ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "accents fold to the base letter (21x6)",
+      "text": "Café Señor naïve Zürich",
+      "cols": 21,
+      "rows": 6,
+      "expected": [
+        "                     ",
+        "                     ",
+        "  CAFE SENOR NAIVE   ",
+        "  ZURICH             ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "accents fold to the base letter (21x8)",
+      "text": "Café Señor naïve Zürich",
+      "cols": 21,
+      "rows": 8,
+      "expected": [
+        "                     ",
+        "                     ",
+        "                     ",
+        "  CAFE SENOR NAIVE   ",
+        "  ZURICH             ",
+        "                     ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "sharp s becomes SS and is measured as two columns (21x6)",
+      "text": "straße und fußball im großen garten",
+      "cols": 21,
+      "rows": 6,
+      "expected": [
+        "                     ",
+        "                     ",
+        "STRASSE UND FUSSBALL ",
+        "IM GROSSEN GARTEN    ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "sharp s becomes SS and is measured as two columns (21x8)",
+      "text": "straße und fußball im großen garten",
+      "cols": 21,
+      "rows": 8,
+      "expected": [
+        "                     ",
+        "                     ",
+        "                     ",
+        "STRASSE UND FUSSBALL ",
+        "IM GROSSEN GARTEN    ",
+        "                     ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "smart punctuation is in the charset (21x6)",
+      "text": "IT’S “QUOTED” – 72°… OK—YES",
+      "cols": 21,
+      "rows": 6,
+      "expected": [
+        "                     ",
+        "                     ",
+        "IT’S “QUOTED” – 72°… ",
+        "OK—YES               ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "smart punctuation is in the charset (21x8)",
+      "text": "IT’S “QUOTED” – 72°… OK—YES",
+      "cols": 21,
+      "rows": 8,
+      "expected": [
+        "                     ",
+        "                     ",
+        "                     ",
+        "IT’S “QUOTED” – 72°… ",
+        "OK—YES               ",
+        "                     ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "character outside the charset becomes a space (21x6)",
+      "text": "PRICE: 5€ OR 4£",
+      "cols": 21,
+      "rows": 6,
+      "expected": [
+        "                     ",
+        "                     ",
+        "   PRICE: 5  OR 4    ",
+        "                     ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "character outside the charset becomes a space (21x8)",
+      "text": "PRICE: 5€ OR 4£",
+      "cols": 21,
+      "rows": 8,
+      "expected": [
+        "                     ",
+        "                     ",
+        "                     ",
+        "   PRICE: 5  OR 4    ",
+        "                     ",
+        "                     ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "emoji becomes one space per code point (21x6)",
+      "text": "HI 😀 THERE",
+      "cols": 21,
+      "rows": 6,
+      "expected": [
+        "                     ",
+        "                     ",
+        "     HI   THERE      ",
+        "                     ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "emoji becomes one space per code point (21x8)",
+      "text": "HI 😀 THERE",
+      "cols": 21,
+      "rows": 8,
+      "expected": [
+        "                     ",
+        "                     ",
+        "                     ",
+        "     HI   THERE      ",
+        "                     ",
+        "                     ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "tab becomes a space (21x6)",
+      "text": "A\tB",
+      "cols": 21,
+      "rows": 6,
+      "expected": [
+        "                     ",
+        "                     ",
+        "         A B         ",
+        "                     ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "tab becomes a space (21x8)",
+      "text": "A\tB",
+      "cols": 21,
+      "rows": 8,
+      "expected": [
+        "                     ",
+        "                     ",
+        "                     ",
+        "         A B         ",
+        "                     ",
+        "                     ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "CRLF and lone CR are line breaks (21x6)",
+      "text": "ONE\r\nTWO\rTHREE",
+      "cols": 21,
+      "rows": 6,
+      "expected": [
+        "                     ",
+        "        ONE          ",
+        "        TWO          ",
+        "        THREE        ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "CRLF and lone CR are line breaks (21x8)",
+      "text": "ONE\r\nTWO\rTHREE",
+      "cols": 21,
+      "rows": 8,
+      "expected": [
+        "                     ",
+        "                     ",
+        "        ONE          ",
+        "        TWO          ",
+        "        THREE        ",
+        "                     ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "every character in the charset (21x6)",
+      "text": " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.:!?-,;'\"()/@#$%&*+=<>[]{}|~‘’“”°–—…",
+      "cols": 21,
+      "rows": 6,
+      "expected": [
+        "                     ",
+        "ABCDEFGHIJKLMNOPQRSTU",
+        "VWXYZ0123456789.:!?-,",
+        ";'\"()/@#$%&*+=<>[]{}|",
+        "~‘’“”°–—…            ",
+        "                     "
+      ]
+    },
+    {
+      "name": "every character in the charset (21x8)",
+      "text": " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.:!?-,;'\"()/@#$%&*+=<>[]{}|~‘’“”°–—…",
+      "cols": 21,
+      "rows": 8,
+      "expected": [
+        "                     ",
+        "                     ",
+        "ABCDEFGHIJKLMNOPQRSTU",
+        "VWXYZ0123456789.:!?-,",
+        ";'\"()/@#$%&*+=<>[]{}|",
+        "~‘’“”°–—…            ",
+        "                     ",
+        "                     "
+      ]
+    },
+    {
+      "name": "narrow board (8x3)",
+      "text": "TINY BOARD TEST",
+      "cols": 8,
+      "rows": 3,
+      "expected": [
+        " TINY   ",
+        " BOARD  ",
+        " TEST   "
+      ]
+    }
+  ]
+}

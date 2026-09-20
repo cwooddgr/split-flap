@@ -1,14 +1,7 @@
 // Split-flap display module
 // Extracted from the original script.js so it can be reused by both pages.
 
-// Supported characters for the split-flap display.
-// Includes:
-// - Space, A–Z, 0–9
-// - Common ASCII punctuation
-// - Smart quotes ‘ ’ “ ” and degree symbol °
-// - En dash, em dash, ellipsis – — …
-const CHARSET =
-    ' ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.:!?-,;\'"()/@#$%&*+=<>[]{}|~‘’“”°–—…';
+import { CHARSET, layoutText } from './layout.js';
 
 class SplitFlapDisplay {
     constructor(containerOrId, cols = 22, rows = 4) {
@@ -134,109 +127,11 @@ class SplitFlapDisplay {
         }
     }
 
-    wrapText(text, maxCols) {
-        // Split text into lines first
-        const inputLines = text.split('\n');
-        const wrappedLines = [];
-
-        inputLines.forEach((line) => {
-            // If line fits, use it as-is
-            if (line.length <= maxCols) {
-                wrappedLines.push(line);
-                return;
-            }
-
-            // Otherwise, wrap at word boundaries
-            const words = line.split(' ');
-            let currentLine = '';
-
-            words.forEach((word) => {
-                const testLine = currentLine ? currentLine + ' ' + word : word;
-
-                if (testLine.length <= maxCols) {
-                    currentLine = testLine;
-                } else {
-                    // Current line is full, start a new line
-                    if (currentLine) {
-                        wrappedLines.push(currentLine);
-                    }
-                    // If a single word is longer than maxCols, truncate it
-                    currentLine =
-                        word.length > maxCols ? word.substring(0, maxCols) : word;
-                }
-            });
-
-            // Add the last line
-            if (currentLine) {
-                wrappedLines.push(currentLine);
-            }
-        });
-
-        return wrappedLines;
-    }
-
     setText(text) {
-        if (typeof text !== 'string') {
-            text = String(text ?? '');
-        }
-
-        // Wrap text at word boundaries into lines
-        let lines = this.wrapText(text, this.cols);
-
-        // Limit to available rows
-        if (lines.length > this.rows) {
-            lines = lines.slice(0, this.rows);
-        }
-
-        // Compute horizontal centering based on the widest line
-        const contentWidths = lines.map((line) =>
-            line.replace(/\s+$/u, '').length
-        );
-        const maxContentWidth =
-            contentWidths.length > 0
-                ? Math.max(...contentWidths)
-                : 0;
-        const horizontalMargin = Math.max(
-            0,
-            Math.floor((this.cols - maxContentWidth) / 2)
-        );
-
-        // Compute vertical centering (blank rows above and below)
-        const blankRows = this.rows - lines.length;
-        const topBlank = blankRows > 0 ? Math.floor(blankRows / 2) : 0;
-        const bottomBlank = blankRows > 0 ? blankRows - topBlank : 0;
-
-        const centeredLines = [];
-        for (let i = 0; i < topBlank; i++) {
-            centeredLines.push('');
-        }
-        centeredLines.push(...lines);
-        for (let i = 0; i < bottomBlank; i++) {
-            centeredLines.push('');
-        }
-
-        // Ensure we have exactly the number of display rows
-        const finalLines = centeredLines.slice(0, this.rows);
-
-        // Process each line
-        finalLines.forEach((line, rowIndex) => {
-            // Uppercase for display
-            let upper = line.toUpperCase();
-
-            // Respect existing trailing spaces in user text only up to content width
-            const trimmedRight = upper.replace(/\s+$/u, '');
-            const maxContentCols = Math.max(this.cols - horizontalMargin, 0);
-            const content = trimmedRight.substring(0, maxContentCols);
-
-            // Build a line that is left-justified within a horizontally centered block
-            let displayLine = ''.padEnd(horizontalMargin, ' ') + content;
-            displayLine = displayLine.padEnd(this.cols, ' ');
-
-            // Trigger animation for each flap in this row
-            displayLine.split('').forEach((char, colIndex) => {
-                if (!CHARSET.includes(char)) {
-                    char = ' ';
-                }
+        // layout.js returns exactly this.rows strings of this.cols characters,
+        // already uppercased and limited to CHARSET.
+        layoutText(text, this.cols, this.rows).forEach((line, rowIndex) => {
+            Array.from(line).forEach((char, colIndex) => {
                 this.flaps[rowIndex][colIndex].targetChar = char;
                 this.animateFlap(rowIndex, colIndex);
             });

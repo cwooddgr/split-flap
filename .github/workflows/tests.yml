@@ -1,0 +1,24 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  web-layout:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node --test tests/layout.test.mjs
+
+  tvos-layout:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Builds only tvos/SplitFlapTV/SplitFlapTV/Layout (no Firebase, no simulator).
+      - run: swift test
+        working-directory: tvos

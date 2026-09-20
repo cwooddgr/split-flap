@@ -18,10 +18,12 @@ disagree, the rules win. Last checked against the code on 2026-09-19.
   - Web display: `cols = 21`, `rows = 6`
   - tvOS display: `cols = 21`, `rows = 8`
 - Each cell displays a single character from a fixed set of 73 characters (`CHARSET`, defined in
-  `splitflap.js` and again in `BoardView.swift`; the two strings are identical):
+  `layout.js` and again in `Layout/BoardCharset.swift`; tests check both against
+  `shared/layout-fixtures.json`):
   - Space, `A–Z`, `0–9`
   - Common punctuation and a few extra glyphs (quotes, degree symbol, dashes, …)
-- Rendering rules (as implemented in `SplitFlapDisplay` in `splitflap.js`):
+- Rendering rules (as implemented in `layout.js`, with the exact expected output for a set of
+  inputs in `shared/layout-fixtures.json`):
   - Text is wrapped at **word boundaries** to fit `cols`.
   - The *block of text* (all lines together) is:
     - **Horizontally centered** based on the widest line:
@@ -41,7 +43,8 @@ disagree, the rules win. Last checked against the code on 2026-09-19.
   2. Wraps each line at spaces to `cols`.
   3. Collects the resulting lines into a list (up to `rows`). Lines past `rows` are dropped, so a
      message that fills 8 rows on tvOS loses its last lines on the 6-row web display.
-  4. Uppercases the text and replaces any character outside `CHARSET` with a space.
+  4. Before any of that, folds accents to the base letter, uppercases the text, and replaces any
+     character outside `CHARSET` with a space. A word longer than the board is broken across lines.
   5. Applies centering as described above.
 
 Displays and controllers **do not** need to know the centering implementation details,
@@ -193,7 +196,7 @@ Canonical behavior:
 
 - `ContentView.swift` generates a random `roomId` once per launch and builds the QR URL.
 - `RoomViewModel.swift` signs in anonymously, then attaches a snapshot listener to `rooms/{roomId}`.
-- `BoardLayout.swift` is a Swift port of the layout in `splitflap.js`, used with `BoardConfig(cols: 21, rows: 8)`.
+- `Layout/BoardLayout.swift` is a Swift port of `layout.js`, used with `BoardConfig(cols: 21, rows: 8)`.
 
 No other coupling exists between the display and controller beyond the shared
 `rooms/{roomId}` document and the `text` field.

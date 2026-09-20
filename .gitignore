@@ -10,3 +10,4 @@ xcuserdata/
 
 # Test tooling
 node_modules/
+.build/

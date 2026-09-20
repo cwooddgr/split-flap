@@ -1,37 +1,11 @@
 import SwiftUI
 
-/// Character set matching the web app's CHARSET
-private let CHARSET: [Character] = Array(
-    " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.:!?-,;'\"()/@#$%&*+=<>[]{}|~\u{2018}\u{2019}\u{201C}\u{201D}°–—…"
-)
+// The charset and the one-step advance live in Layout/BoardCharset.swift so the
+// layout tests can reach them; these keep the names this file has always used.
+private let CHARSET = BoardCharset.characters
 
-/// O(1) lookup table for character → index in CHARSET.
-private let CHARSET_INDEX: [Character: Int] = {
-    var dict = [Character: Int](minimumCapacity: CHARSET.count)
-    for (i, c) in CHARSET.enumerated() {
-        dict[c] = i
-    }
-    return dict
-}()
-
-/// Advance a character one step through CHARSET toward the target.
-/// Returns the next character, or nil if already at target.
 private func advanceChar(_ current: Character, toward target: Character) -> Character? {
-    guard current != target else { return nil }
-
-    guard let currentIndex = CHARSET_INDEX[current] else {
-        // Unknown character, snap to target
-        return target
-    }
-
-    // Unreachable target (not in CHARSET): snap rather than cycle forever.
-    // Targets are sanitized in targetBoard, so this is a safety net.
-    guard CHARSET_INDEX[target] != nil else {
-        return target
-    }
-
-    let nextIndex = (currentIndex + 1) % CHARSET.count
-    return CHARSET[nextIndex]
+    BoardCharset.advance(current, toward: target)
 }
 
 /// Board geometry — matches the metrics of the previous SwiftUI tile grid
@@ -100,14 +74,12 @@ struct BoardView: View {
     /// Max per-tile start delay within a tick, so tiles don't move in lockstep.
     private static let maxStagger: TimeInterval = 0.018
 
-    /// Computed target board from the message. Characters the board has no
-    /// flap for become spaces (matching the web display in splitflap.js) —
-    /// an out-of-CHARSET target would otherwise make its tile cycle forever.
+    /// Computed target board from the message. BoardLayout only emits
+    /// characters the board has a flap for (anything else becomes a space,
+    /// matching the web display); an out-of-charset target would otherwise
+    /// make its tile cycle forever.
     private var targetBoard: [[Character]] {
-        let rows = BoardLayout.layout(message: message, config: config)
-        return rows.map { row in
-            row.map { CHARSET_INDEX[$0] != nil ? $0 : " " }
-        }
+        BoardLayout.layout(message: message, cols: config.cols, rows: config.rows).map(Array.init)
     }
 
     var body: some View {

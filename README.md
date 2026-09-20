@@ -33,6 +33,7 @@ The display shows a grid of animated split‑flap cells; a separate “remote”
   - `index.html` – Display page for the board.
   - `control.html` – Remote controller UI for phones.
   - `style.css` – Shared styling for display and remote.
+  - `layout.js` – Turns a message into rows of characters (wrapping and centering). No DOM, so it can be tested.
   - `splitflap.js` – Split‑flap board rendering and animation.
   - `display.js` – Wires the display page to Firebase + QR code.
   - `control.js` – Wires the remote page to Firebase and presets.
@@ -47,7 +48,8 @@ The display shows a grid of animated split‑flap cells; a separate “remote”
     - `ContentView.swift` – Top‑level UI.
     - `Models/RoomState.swift` – Board/room data model.
     - `ViewModels/RoomViewModel.swift` – Binds Firestore state to the views.
-    - `Views/BoardLayout.swift`, `BoardView.swift`, `QRCodeView.swift` – Main views.
+    - `Layout/BoardLayout.swift`, `Layout/BoardCharset.swift` – Swift port of `layout.js`. Both ports are tested against `shared/layout-fixtures.json` (`node --test tests/layout.test.mjs`, and `swift test` inside `tvos/`).
+    - `Views/BoardView.swift`, `Views/QRCodeView.swift` – Main views.
     - `SoundEffects.swift` – Optional split‑flap sound effects.
     - `GoogleService-Info.plist` – Firebase config for tvOS. The tracked file points at our project, so swap in your own if you fork.
 
