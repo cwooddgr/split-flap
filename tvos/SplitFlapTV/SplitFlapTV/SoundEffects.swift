@@ -65,6 +65,34 @@ final class FlipSoundPlayer {
             players.append(player)
         }
 
+        // The clacks are decoration, so mix with whatever else is playing.
+        // Without this the session defaults to .soloAmbient, which is
+        // nonmixable: starting the engine stopped the user's music (confirmed
+        // on an Apple TV, 2026-09-20). Must be set before the engine starts,
+        // because starting it is what activates the session.
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.ambient)
+        } catch {
+            print("FlipSoundPlayer: failed to set audio session category: \(error)")
+        }
+
+        // When the output hardware's channel count or sample rate changes (a
+        // route change to AirPods or a HomePod, a TV format switch) the engine
+        // stops itself and posts this. Nothing else restarts it, and playClick
+        // skips every clack while it's stopped, so without this the app would
+        // stay silent until relaunch. The callback arrives on an internal
+        // queue; hop to the main actor before touching the engine.
+        NotificationCenter.default.addObserver(
+            forName: .AVAudioEngineConfigurationChange, object: engine, queue: nil
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.startEngine() }
+        }
+
+        startEngine()
+    }
+
+    private func startEngine() {
+        guard !players.isEmpty, !engine.isRunning else { return }
         do {
             try engine.start()
             for player in players {
