@@ -122,7 +122,7 @@ const firebaseConfig = {
 
 ## Firestore Security Rules
 
-The rules are in [`firestore.rules`](firestore.rules) at the root of this repo. The app signs in anonymously, so the rules accept any signed-in user (`request.auth != null`). They also require room IDs to be 4 to 12 characters from A–Z and 0–9, require every write to carry `text` as a string of at most 10,000 characters, and deny deletes and everything outside the `rooms` collection. Old rooms are removed by a Firestore TTL policy on `expiresAt`.
+The rules are in [`firestore.rules`](firestore.rules) at the root of this repo. The app signs in anonymously, so the rules accept any signed-in user (`request.auth != null`). They also require room IDs to be 4 to 12 characters from A–Z and 0–9, allow reading one room at a time but never listing them, and deny deletes and everything outside the `rooms` collection. A write may only contain `text` (at most 1,000 characters), `source`, `updatedAt`, and `expiresAt`, and `expiresAt` is required so that no room can outlive the cleanup. Old rooms are removed by a Firestore TTL policy on `expiresAt`.
 
 Deploy them with the Firebase CLI (`.firebaserc` names the project, so change it to yours first):
 
@@ -132,7 +132,7 @@ firebase deploy --only firestore:rules
 
 You can also paste the file's contents into Firebase Console → Firestore → Rules.
 
-The rules currently grant `read`, which covers both `get` and `list`. A listener on a single document should only need `get`, and we plan to narrow the rule once we have tested that.
+You can check the rules before deploying with `python3 tests/rules_test.py`, which runs a table of allow and deny cases through Google's rules-test API. It needs `gcloud auth login` and the project name at the top of the script changed to yours.
 
 ---
 

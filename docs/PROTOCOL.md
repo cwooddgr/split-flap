@@ -94,10 +94,10 @@ Current fields:
 - `updatedAt` (timestamp, optional)
   - Firestore `Timestamp` set via `serverTimestamp()` in writes.
   - Used only for debugging / ordering; not required for rendering.
-- `expiresAt` (timestamp, optional in the rules, always written by the web remote)
+- `expiresAt` (timestamp, **required** by the rules)
   - Set to the phone's clock plus 7 days on every write, so it rolls forward with each message.
   - A Firestore TTL policy on this field deletes the document after it passes. Deletion usually
-    follows within about a day. A document written without `expiresAt` is never cleaned up.
+    follows within about a day. The rules refuse a write that would leave the document without it.
   - When the document is deleted under a live listener, both displays keep showing their last message.
 
 ### Example documents
@@ -106,7 +106,8 @@ Minimal:
 
 ```json
 {
-  "text": "HELLO WORLD"
+  "text": "HELLO WORLD",
+  "expiresAt": "2026-09-27T18:06:00.000Z"
 }
 ```
 
@@ -151,7 +152,7 @@ Canonical write shape:
 - Uses `setDoc(roomRef, { text, updatedAt: serverTimestamp(), expiresAt, source }, { merge: true })`
   in `control.js`. This first write is what creates the room document; displays never write.
 - `roomRef` is `doc(db, "rooms", roomId)`.
-- The rules require `text` to be a string of at most 10,000 characters. They do not check any other field today.
+- The rules judge the whole document after the merge. Only `text`, `source`, `updatedAt`, and `expiresAt` may exist. `text` must be a string of at most 1,000 characters, `expiresAt` is required and must be a timestamp less than 30 days out, `source` a string of at most 32 characters, and `updatedAt` a timestamp. A new field has to be added to `firestore.rules` before any client writes it.
 
 Any other controller should:
 

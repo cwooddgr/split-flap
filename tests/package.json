@@ -1,0 +1,9 @@
+{
+  "name": "flipflap-tests",
+  "private": true,
+  "type": "module",
+  "description": "Live client-path check for Flip Flap's Firestore rules. See listener_check.mjs.",
+  "dependencies": {
+    "firebase": "11.0.0"
+  }
+}

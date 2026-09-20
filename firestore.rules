@@ -2,15 +2,32 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /rooms/{roomId} {
+      function validRoomId() {
+        return roomId.matches('^[A-Z0-9]{4,12}$');
+      }
+
+      // The whole document after the write (setDoc with merge sends the merged
+      // result here), so a write can neither add stray fields nor drop expiresAt.
+      function validMessage() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['text', 'source', 'updatedAt', 'expiresAt'])
+          && d.text is string
+          && d.text.size() <= 1000
+          // Required, so the TTL policy can always clean the room up. The remote
+          // sets it from the phone's clock (now + 7 days), hence the loose bound.
+          && d.expiresAt is timestamp
+          && d.expiresAt < request.time + duration.value(30, 'd')
+          && (!('source' in d) || (d.source is string && d.source.size() <= 32))
+          && (!('updatedAt' in d) || d.updatedAt is timestamp);
+      }
+
       // Anonymous auth counts as signed in (web and tvOS both use it).
-      // `read` (not `get`) so onSnapshot() listeners work.
-      allow read: if request.auth != null
-        && roomId.matches('^[A-Z0-9]{4,12}$');
+      // `get` only: a listener on one document is a single-document read, and
+      // nothing in either client queries the collection, so `list` stays denied.
+      allow get: if request.auth != null && validRoomId();
+
       // No client deletes rooms; the expiresAt TTL policy does that server-side.
-      allow create, update: if request.auth != null
-        && roomId.matches('^[A-Z0-9]{4,12}$')
-        && request.resource.data.text is string
-        && request.resource.data.text.size() <= 10000;
+      allow create, update: if request.auth != null && validRoomId() && validMessage();
     }
     match /{document=**} {
       allow read, write: if false;

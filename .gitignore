@@ -7,3 +7,6 @@ xcuserdata/
 
 # Claude Code
 .claude/
+
+# Test tooling
+node_modules/

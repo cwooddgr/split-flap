@@ -143,9 +143,10 @@ The `rooms` collection must be explicitly allowed. Without this, real-time `onSn
 
 Key points:
 - `request.auth != null` allows anonymous auth (used by both web and tvOS)
-- The rules grant `read` (`get` plus `list`). An earlier version of this file said `onSnapshot()` needs `read` and not `get`; that looks like folklore (proposed-by-agent 2026-09-19). Firebase's rules docs say `get` applies to single-document reads and `list` to queries, and production showed 4,428 GET rule evaluations and zero LIST evaluations in 41 days with listeners live. Narrowing to `allow get` is in the plan, but nobody has run it under the emulator or against live yet, so test a single-document listener first
+- Reads are `allow get` only, so nobody can query the collection. An earlier version of this file said `onSnapshot()` needs `read` and not `get`; that was folklore. Firebase's rules docs say `get` applies to single-document reads and `list` to queries, and a single-document listener is a `get`. **As of 2026-09-20 these rules are in the repo but not deployed** (the live rules are still the looser ones from commit `6a39f00`); the first thing to do after deploying is run `listener_check.mjs --strict`, which is the live proof that a listener works under `get`. Update this line when that has happened
 - Room IDs must match `^[A-Z0-9]{4,12}$` (both clients generate 6–8 characters)
-- Writes must carry `text` as a string of at most 10,000 characters; every client write already does
+- A write is judged on the whole document after the merge: only `text`, `source`, `updatedAt`, and `expiresAt` may exist; `text` is a string of at most 1,000 characters (the remote's textarea has the same `maxlength`); `expiresAt` is required, a timestamp, and less than 30 days out (the remote sends the phone's clock plus 7 days); `source` is a string of at most 32 characters; `updatedAt` is a timestamp. Anything a client adds to the document shape has to be added to the rules first, or the write is refused without any message in the remote's UI
+- Test before deploying: `python3 tests/rules_test.py` runs a table of allow and deny cases through Google's stateless rules-test API (no emulator, no Java, touches no data). After deploying: `cd tests && npm install && node listener_check.mjs --strict` runs the real SDK against production (sign in, listen, write, and check the forbidden writes are refused); it prints a uid and room to delete afterwards
 - No client deletes rooms. The `expiresAt` TTL policy removes them server-side, so delete is denied
 
 ## Audit and plan
