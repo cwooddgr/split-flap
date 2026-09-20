@@ -15,9 +15,17 @@ import FirebaseFirestore
 @MainActor
 final class AutoTestDriver {
     /// Master switch. When true the app uses `roomId` instead of a random
-    /// room so the metrics doc has a known address. Off by default so DEBUG
-    /// builds behave normally; flip on for self-driving latency runs.
-    static let enabled = false
+    /// room so the metrics doc has a known address. Off unless the app is
+    /// launched with the `-AutoTest` argument (Xcode: Edit Scheme, Run,
+    /// Arguments; or `xcrun devicectl device process launch ... -- -AutoTest`),
+    /// so nobody has to edit source and remember to revert it.
+    ///
+    /// It writes to the production Firestore project. Under the rules in
+    /// `firestore.rules` from 2026-09-20 (`text` at most 1,000 characters) the
+    /// room writes pass, but the metrics document packs its JSON into `text`
+    /// and will be refused once it outgrows that; the same numbers are in the
+    /// debug log.
+    static let enabled = ProcessInfo.processInfo.arguments.contains("-AutoTest")
     static let roomId = "DBGTEST1"
 
     static let shared = AutoTestDriver()
