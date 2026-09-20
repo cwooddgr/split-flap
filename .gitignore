@@ -11,3 +11,6 @@ xcuserdata/
 # Test tooling
 node_modules/
 .build/
+
+# App Store screenshots and the App Preview video (kept locally; 3b, 2026-09-20)
+tvos/Flip Flap tvOS Screenshots/
