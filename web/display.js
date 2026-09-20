@@ -70,12 +70,11 @@ if (qrElement && window.QRCode) {
     // Also store room in the hash as a fallback, in case query params are stripped
     controlUrl.hash = 'room=' + roomId;
 
-    // Drawn large; the stylesheet scales it to the screen.
     // eslint-disable-next-line no-new
     new QRCode(qrElement, {
         text: controlUrl.toString(),
-        width: 512,
-        height: 512,
+        width: 112,
+        height: 112,
         colorDark: '#000000',
         colorLight: '#ffffff',
         correctLevel: window.QRCode.CorrectLevel.M,
@@ -93,20 +92,12 @@ function showAudioPrompt(needsGesture) {
 display.sound.onStateChange = showAudioPrompt;
 showAudioPrompt(display.sound.needsGesture);
 
-// A click that enables sound does only that. Any other click toggles the QR code.
+// A click that enables sound does only that. Any other click toggles the QR
+// code, which otherwise stays up: only the person at the display hides it.
 document.addEventListener('click', () => {
     if (audioPromptEl && !audioPromptEl.classList.contains('hidden')) return;
     if (qrContainer && !isSmallScreen) qrContainer.classList.toggle('hidden');
 });
-
-// Once a remote has sent something, the QR code has done its job. A click
-// brings it back for the next phone.
-let hidQrForFirstMessage = false;
-function hideQrAfterFirstMessage() {
-    if (hidQrForFirstMessage) return;
-    hidQrForFirstMessage = true;
-    if (qrContainer) qrContainer.classList.add('hidden');
-}
 
 // Keep the screen awake. The lock is released whenever the tab is hidden, so
 // ask again each time it comes back. Not every browser has it.
@@ -174,7 +165,6 @@ function listen() {
             const data = snapshot.data();
             if (typeof data.text === 'string') {
                 display.setText(data.text);
-                hideQrAfterFirstMessage();
             }
         },
         (error) => {

@@ -32,10 +32,11 @@ body {
     /* One unit is a tile's width, the largest that fits the grid in the window
        both ways. splitflap.js sets --cols and --rows. The board is
        (1.13 cols + 1.21) units wide and (1.5 rows + 1.17) tall, plus its
-       border, inside the body's 24px padding. */
+       border, inside the body's 24px padding and above the room kept for the
+       QR code. */
     --u: min(
         calc((100vw - 54px) / (var(--cols, 21) * 1.13 + 1.21)),
-        calc((100vh - 54px) / (var(--rows, 6) * 1.5 + 1.17))
+        calc((100vh - 54px - var(--qr-room)) / (var(--rows, 6) * 1.5 + 1.17))
     );
     background: #2c2c2c;
     padding: calc(var(--u) * 0.67);
@@ -60,7 +61,9 @@ body {
 }
 
 .display-container {
+    --qr-room: 120px; /* leave space so QR overlay doesn't cover text */
     position: relative;
+    padding-bottom: var(--qr-room);
 }
 
 .flap-container {
@@ -254,19 +257,10 @@ body {
 }
 
 #qrcode {
-    /* Big enough to scan from a couch. display.js draws it at 512px. */
-    width: clamp(140px, 11vw, 280px);
-    height: clamp(140px, 11vw, 280px);
+    width: 112px;
+    height: 112px;
     background: #ffffff;
     border-radius: 8px;
-    overflow: hidden;
-}
-
-#qrcode img,
-#qrcode canvas {
-    width: 100%;
-    height: 100%;
-    image-rendering: pixelated;
 }
 
 #qr-container.hidden {
@@ -486,6 +480,10 @@ button:active {
 @media (min-width: 1400px) {
     body {
         padding: 16px 24px;
+    }
+
+    .display-container {
+        --qr-room: 80px;
     }
 
 }
