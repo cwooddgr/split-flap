@@ -1,6 +1,9 @@
 import SwiftUI
 import FirebaseCore
 import FirebaseFirestore
+#if DEBUG
+import AVFoundation
+#endif
 
 @main
 struct FlipFlapApp: App {
@@ -14,6 +17,8 @@ struct FlipFlapApp: App {
         #if DEBUG
         Firestore.enableLogging(true)
         MainThreadWatchdog.shared.start()
+        // Music-stops bug: was other audio still playing before we touched audio at all?
+        debugLog("[AUDIO] at app init: otherAudioPlaying=\(AVAudioSession.sharedInstance().isOtherAudioPlaying) category=\(AVAudioSession.sharedInstance().category.rawValue)")
         #endif
     }
 

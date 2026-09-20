@@ -24,9 +24,31 @@ final class FlipSoundPlayer {
 
     private var clackBuffers: [AVAudioPCMBuffer] = []
 
+    /// DEBUG bisect switch for the "launching stops the user's music" bug:
+    /// set to true and the app never touches AVAudioSession or AVAudioEngine.
+    /// If music still stops with this on, the cause isn't in this file.
+    /// Remove once that bug is closed.
+    #if DEBUG
+    private static let soundDisabledForBisect = false
+    #endif
+
     private init() {
+        #if DEBUG
+        if Self.soundDisabledForBisect {
+            debugLog("[AUDIO] sound disabled for bisect; session and engine never touched")
+            return
+        }
+        #endif
         loadBuffers()
         setupEngine()
+    }
+
+    /// One line of audio-session state, for the music-stops bug.
+    private func logSession(_ label: String) {
+        #if DEBUG
+        let session = AVAudioSession.sharedInstance()
+        debugLog("[AUDIO] \(label): category=\(session.category.rawValue) options=\(session.categoryOptions.rawValue) otherAudioPlaying=\(session.isOtherAudioPlaying) engineRunning=\(engine.isRunning)")
+        #endif
     }
 
     private func loadBuffers() {
@@ -70,11 +92,14 @@ final class FlipSoundPlayer {
         // nonmixable: starting the engine stopped the user's music (confirmed
         // on an Apple TV, 2026-09-20). Must be set before the engine starts,
         // because starting it is what activates the session.
+        logSession("before setCategory")
         do {
             try AVAudioSession.sharedInstance().setCategory(.ambient)
         } catch {
             print("FlipSoundPlayer: failed to set audio session category: \(error)")
+            debugLog("[AUDIO] setCategory(.ambient) FAILED: \(error)")
         }
+        logSession("after setCategory")
 
         // When the output hardware's channel count or sample rate changes (a
         // route change to AirPods or a HomePod, a TV format switch) the engine
@@ -93,6 +118,7 @@ final class FlipSoundPlayer {
 
     private func startEngine() {
         guard !players.isEmpty, !engine.isRunning else { return }
+        logSession("before engine.start")
         do {
             try engine.start()
             for player in players {
@@ -100,7 +126,9 @@ final class FlipSoundPlayer {
             }
         } catch {
             print("FlipSoundPlayer: failed to start AVAudioEngine: \(error)")
+            debugLog("[AUDIO] engine.start FAILED: \(error)")
         }
+        logSession("after engine.start")
     }
 
     // MARK: - Playback
