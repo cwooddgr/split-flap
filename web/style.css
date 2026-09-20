@@ -215,6 +215,25 @@ body {
     display: none;
 }
 
+/* Display: connection status, shown only while something is wrong */
+#status {
+    position: fixed;
+    left: 24px;
+    bottom: 24px;
+    padding: 8px 16px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.7);
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    z-index: 95;
+}
+
+#status.hidden {
+    display: none;
+}
+
 /* Display: small-screen message overlay */
 #smallScreenMessage {
     position: fixed;
@@ -392,6 +411,18 @@ button:active {
     color: #ff6b6b;
     margin-bottom: 16px;
     font-size: 14px;
+}
+
+.send-status {
+    min-height: 20px;
+    margin: 12px 0 0;
+    text-align: center;
+    font-size: 14px;
+    color: #888;
+}
+
+.send-status.error {
+    color: #ff6b6b;
 }
 
 .cross-promo {

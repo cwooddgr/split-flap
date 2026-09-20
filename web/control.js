@@ -36,10 +36,11 @@ if (!roomId || !isValidRoom(roomId)) {
     throw new Error('Invalid or missing room id. Please rescan the QR code.');
 }
 
-(async () => {
-    // Wait for anonymous auth so Firestore rules allow access
-    await ensureSignedIn();
+// Anonymous auth, so Firestore rules allow the write. It starts now and the
+// buttons work straight away; a send waits for it.
+const signedIn = ensureSignedIn();
 
+(() => {
     const roomRef = doc(db, 'rooms', roomId);
 
     const textInput = document.getElementById('textInput');
@@ -131,9 +132,24 @@ if (!roomId || !isValidRoom(roomId)) {
 
     // --- Firestore write ---
 
+    const statusEl = document.getElementById('sendStatus');
+    const SLOW_SEND_MS = 6000;
+    let sendCount = 0;
+
+    function setStatus(message, isError = false) {
+        if (!statusEl) return;
+        statusEl.textContent = message;
+        statusEl.classList.toggle('error', isError);
+    }
+
     async function sendText(source) {
         if (!textInput) return;
         const text = textInput.value || '';
+        // Only the newest send reports; an older one finishing late stays quiet.
+        const thisSend = ++sendCount;
+        const report = (message, isError) => {
+            if (thisSend === sendCount) setStatus(message, isError);
+        };
 
         // Set a rolling expiration so old rooms are cleaned up automatically
         // by Firestore TTL. We keep each room alive for 7 days after the last
@@ -141,7 +157,12 @@ if (!roomId || !isValidRoom(roomId)) {
         const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
         const expiresAt = new Date(Date.now() + WEEK_MS);
 
+        report('Sending…');
+        // Offline, the SDK queues the write and the promise stays pending until
+        // the server has it. Say so instead of looking stuck.
+        const slowTimer = setTimeout(() => report('Still trying to send…'), SLOW_SEND_MS);
         try {
+            await signedIn;
             await setDoc(
                 roomRef,
                 {
@@ -152,8 +173,14 @@ if (!roomId || !isValidRoom(roomId)) {
                 },
                 { merge: true }
             );
+            report('Sent');
         } catch (err) {
+            // A rejection means the server refused the write (rules), not a bad
+            // connection.
             console.error('Error writing message to room', err);
+            report("Couldn't send. Try again.", true);
+        } finally {
+            clearTimeout(slowTimer);
         }
     }
 

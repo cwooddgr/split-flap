@@ -6,16 +6,12 @@ import {
     getFirestore,
     doc,
     setDoc,
-    getDoc,
     onSnapshot,
     serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
 import {
     getAuth,
     signInAnonymously,
-    signOut,
-    onAuthStateChanged,
-    getIdToken,
 } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
 
 // Your web app's Firebase configuration
@@ -32,48 +28,29 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// Ensure we have an authenticated (anonymous) user before using Firestore.
-function ensureSignedIn() {
-    return new Promise((resolve, reject) => {
-        if (auth.currentUser) {
-            resolve(auth.currentUser);
-            return;
+// Retry delays: 1 s, 2 s, 4 s, ... capped at a minute.
+function backoffMs(attempt) {
+    return Math.min(60000, 1000 * 2 ** attempt);
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Resolves once there is an anonymous user, retrying for as long as it takes.
+// signInAnonymously returns the persisted user when the browser already has
+// one. After this the SDK keeps the ID token fresh by itself; it needs the
+// API key to allow securetoken.googleapis.com for that (see CLAUDE.md).
+// Never sign out to "fix" a connection: that makes a new account every time.
+async function ensureSignedIn(onRetry) {
+    for (let attempt = 0; ; attempt++) {
+        try {
+            const { user } = await signInAnonymously(auth);
+            return user;
+        } catch (err) {
+            console.error("Anonymous sign-in failed, will retry", err);
+            if (onRetry) onRetry(err);
+            await sleep(backoffMs(attempt));
         }
-
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-            if (user) {
-                unsubscribe();
-                resolve(user);
-            }
-        });
-
-        signInAnonymously(auth).catch((err) => {
-            console.error("Anonymous sign-in failed", err);
-            unsubscribe();
-            reject(err);
-        });
-    });
-}
-
-// Force a fresh anonymous sign-in by signing out first.
-// Use this when the auth token may have expired.
-async function forceReauthenticate() {
-    try {
-        await signOut(auth);
-    } catch (err) {
-        console.warn("Sign out failed (may already be signed out):", err);
     }
-    return signInAnonymously(auth);
 }
 
-// Proactively refresh the auth token before it expires.
-// Call this periodically (e.g., every 55 minutes) to avoid token expiry gaps.
-async function refreshAuthToken() {
-    if (!auth.currentUser) {
-        return null;
-    }
-    // Force refresh by passing true
-    return getIdToken(auth.currentUser, true);
-}
-
-export { db, doc, setDoc, getDoc, onSnapshot, serverTimestamp, ensureSignedIn, forceReauthenticate, refreshAuthToken };
+export { db, doc, setDoc, onSnapshot, serverTimestamp, ensureSignedIn, backoffMs };
