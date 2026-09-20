@@ -10,6 +10,8 @@ struct FlipFlapApp: App {
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
+        // Before anything can create an audio engine; see configureAudioSession.
+        FlipSoundPlayer.configureAudioSession()
         #if DEBUG
         FirebaseConfiguration.shared.setLoggerLevel(.debug)
         #endif

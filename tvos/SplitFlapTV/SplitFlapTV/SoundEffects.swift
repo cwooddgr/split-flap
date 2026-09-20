@@ -15,7 +15,7 @@ final class FlipSoundPlayer {
     /// Length of one animation tick — clack jitter is spread across this window.
     private static let tickDuration = 0.06
 
-    private let engine = AVAudioEngine()
+    private let engine: AVAudioEngine
 
     /// Pool of player nodes used round-robin so overlapping clacks can play
     /// simultaneously (a single AVAudioPlayerNode plays buffers sequentially).
@@ -24,21 +24,30 @@ final class FlipSoundPlayer {
 
     private var clackBuffers: [AVAudioPCMBuffer] = []
 
-    /// DEBUG bisect switch for the "launching stops the user's music" bug:
-    /// set to true and the app never touches AVAudioSession or AVAudioEngine.
-    /// If music still stops with this on, the cause isn't in this file.
-    /// Remove once that bug is closed.
-    #if DEBUG
-    private static let soundDisabledForBisect = false
-    #endif
+    /// The clacks are decoration, so mix with whatever else is playing. The
+    /// session defaults to .soloAmbient, which is nonmixable and stops the
+    /// user's music.
+    ///
+    /// This has to run before any AVAudioEngine exists. Device logs from
+    /// 2026-09-20 showed the music already stopped by the time the engine had
+    /// been created and the players connected to its main mixer, before
+    /// engine.start() was ever called, so setting the category just ahead of
+    /// start() was too late. FlipFlapApp.init calls this at launch, and init
+    /// below calls it again ahead of creating the engine in case the order of
+    /// first use ever changes.
+    static func configureAudioSession() {
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.ambient)
+        } catch {
+            print("FlipSoundPlayer: failed to set audio session category: \(error)")
+            debugLog("[AUDIO] setCategory(.ambient) FAILED: \(error)")
+        }
+    }
 
     private init() {
-        #if DEBUG
-        if Self.soundDisabledForBisect {
-            debugLog("[AUDIO] sound disabled for bisect; session and engine never touched")
-            return
-        }
-        #endif
+        Self.configureAudioSession()
+        engine = AVAudioEngine()
+        logSession("engine created")
         loadBuffers()
         setupEngine()
     }
@@ -87,19 +96,7 @@ final class FlipSoundPlayer {
             players.append(player)
         }
 
-        // The clacks are decoration, so mix with whatever else is playing.
-        // Without this the session defaults to .soloAmbient, which is
-        // nonmixable: starting the engine stopped the user's music (confirmed
-        // on an Apple TV, 2026-09-20). Must be set before the engine starts,
-        // because starting it is what activates the session.
-        logSession("before setCategory")
-        do {
-            try AVAudioSession.sharedInstance().setCategory(.ambient)
-        } catch {
-            print("FlipSoundPlayer: failed to set audio session category: \(error)")
-            debugLog("[AUDIO] setCategory(.ambient) FAILED: \(error)")
-        }
-        logSession("after setCategory")
+        logSession("players connected")
 
         // When the output hardware's channel count or sample rate changes (a
         // route change to AirPods or a HomePod, a TV format switch) the engine
