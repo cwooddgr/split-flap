@@ -55,16 +55,16 @@
 </head>
 <body>
     <h1>Privacy Policy</h1>
-    <p class="updated">Last updated: January 9, 2026</p>
+    <p class="updated">Last updated: September 20, 2026</p>
 
-    <p><span class="app-name">Flip Flap</span> ("the App") is committed to protecting your privacy. This policy explains how we handle information when you use our Apple TV application.</p>
+    <p><span class="app-name">Flip Flap</span> ("the App") is committed to protecting your privacy. This policy explains how we handle information when you use Flip Flap on Apple TV, the web display at flipflap.dgrlabs.co, or the web remote that opens when you scan a display's QR code.</p>
 
     <h2>Information We Collect</h2>
     <p>The App collects minimal information necessary for functionality:</p>
     <ul>
-        <li><strong>Anonymous Authentication:</strong> We use Firebase Anonymous Authentication to create a temporary, anonymous session. No personal information (name, email, phone) is collected or required.</li>
-        <li><strong>Message Content:</strong> Messages you send to the display are temporarily stored in Firebase Firestore. Messages are associated only with a random room ID, not with any personal identifier.</li>
-        <li><strong>Room IDs:</strong> A random alphanumeric room ID is generated each time you launch the app. This ID is not linked to your identity.</li>
+        <li><strong>Anonymous Authentication:</strong> We use Firebase Anonymous Authentication to sign each display and remote in without an account. Firebase creates a random identifier for that anonymous session. We never ask for your name, email, or phone number, and we have no way to connect the identifier to you.</li>
+        <li><strong>Message Content:</strong> Messages you send to a display are stored for a short time in Firebase Firestore. We store the text, the time it was sent, and which button sent it, under a random room ID. We don't store any identifier for you or your device with the message.</li>
+        <li><strong>Room IDs:</strong> A display makes up a random room ID each time you launch the app or load the display page. The ID is not linked to your identity.</li>
     </ul>
 
     <h2>Information We Do Not Collect</h2>
@@ -78,9 +78,9 @@
 
     <h2>Data Storage and Retention</h2>
     <ul>
-        <li>Messages are stored temporarily in Firebase cloud servers</li>
-        <li>Messages may expire and be automatically deleted after 7 days</li>
-        <li>No permanent record of messages is maintained</li>
+        <li>Messages are stored on Firebase cloud servers</li>
+        <li>A room and its message are deleted 7 days after the last message sent to that room. The deletion is automatic and can take up to a day to happen after the 7 days are up</li>
+        <li>We keep no other record of messages</li>
         <li>Data is processed in accordance with Google Firebase's security practices</li>
     </ul>
 
@@ -90,10 +90,15 @@
         <li>Anonymous authentication</li>
         <li>Real-time message synchronization</li>
     </ul>
+    <p>Like any online service, Firebase sees basic connection details such as your IP address when your device talks to it, as described in Google's policy.</p>
     <p>Firebase's privacy policy: <a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener">https://firebase.google.com/support/privacy</a></p>
 
     <h2>Data Sharing</h2>
-    <p>We do not sell, trade, or share your data with third parties for marketing purposes. Message content is only transmitted between your devices for display purposes.</p>
+    <p>We do not sell, trade, or share your data with third parties for marketing purposes. A message travels from the remote to our Firebase database, and from there to the display showing that room.</p>
+    <p>A room ID works like a key. Anyone who has it, for example anyone who scanned the display's QR code, can read and change that room's message until the display starts a new room. Please don't put anything private on the board.</p>
+
+    <h2>Links on the Remote Page</h2>
+    <p>The web remote shows a link to another DGR Labs app. The App Store badge image loads from Apple. If you tap the link, it goes through our own short-link service, which records the click along with your country and city as estimated by our hosting provider, your browser's user-agent string, and the site you came from. It does not record your IP address or your room ID.</p>
 
     <h2>Children's Privacy</h2>
     <p>The App does not knowingly collect information from children under 13. The App contains no user accounts, social features, or mechanisms for children to share personal information.</p>
@@ -102,6 +107,7 @@
     <p>We may update this privacy policy from time to time. Changes will be reflected by updating the "Last updated" date above.</p>
 
     <h2>Contact</h2>
-    <p>If you have questions about this privacy policy, please visit our <a href="https://github.com/cwooddgr/split-flap">GitHub repository</a>.</p>
+    <p>If you have questions about this privacy policy, email <a href="mailto:support@dgrlabs.co">support@dgrlabs.co</a>.</p>
+    <p>This page covers Flip Flap only. The policy for all DGR Labs apps, which includes the same Flip Flap terms, is at <a href="https://dgrlabs.co/privacy.html">dgrlabs.co/privacy.html</a>.</p>
 </body>
 </html>

@@ -416,6 +416,16 @@ button:active {
     margin: 0 0 12px;
 }
 
+.privacy-link {
+    margin: 24px 0 0;
+    text-align: center;
+    font-size: 13px;
+}
+
+.privacy-link a {
+    color: #888;
+}
+
 .app-store-badge img {
     height: 40px;
 }
