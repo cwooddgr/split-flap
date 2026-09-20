@@ -1,0 +1,19 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /rooms/{roomId} {
+      // Anonymous auth counts as signed in (web and tvOS both use it).
+      // `read` (not `get`) so onSnapshot() listeners work.
+      allow read: if request.auth != null
+        && roomId.matches('^[A-Z0-9]{4,12}$');
+      // No client deletes rooms; the expiresAt TTL policy does that server-side.
+      allow create, update: if request.auth != null
+        && roomId.matches('^[A-Z0-9]{4,12}$')
+        && request.resource.data.text is string
+        && request.resource.data.text.size() <= 10000;
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

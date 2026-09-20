@@ -119,30 +119,22 @@ The tvOS app uses a centralized animation coordinator (single `Task` with a time
 - **Cloud Firestore** enabled (Native mode)
 - **Anonymous authentication** enabled
 - **Authorized domains** configured (Firebase Console → Authentication → Settings → Authorized domains)
-- **API key** configured with correct referrer restrictions (Google Cloud Console → APIs & Services → Credentials)
+- **API keys** (verified with `gcloud services api-keys list`, 2026-09-19): the web key in `firebase-init.js` is the "Browser key", limited to the Firestore and Identity Toolkit APIs with no HTTP referrer restriction (left that way, decided-by-user 2026-09-19). The shipped tvOS app uses the key Firebase named "iOS key" (Firebase registers a tvOS app as an iOS app); it has been in `GoogleService-Info.plist` since 2026-02-14, before 1.0 shipped, so never delete it. The key named "tvOS key" is the one with the `co.dgrlabs.flipflap` bundle restriction, but no shipped build uses it (0 requests in the 42 days to 2026-09-19).
 - Web config in `firebase-init.js`, tvOS config via `GoogleService-Info.plist`
 
 ### Firestore Security Rules
 
-The `rooms` collection must be explicitly allowed. Without this, real-time `onSnapshot` listeners will fail silently:
+The rules live in `firestore.rules` at the repo root; that file is the source of truth, so don't copy them into docs (a copy here drifted from the deployed rules between 2025-12 and 2026-09). Deploy with:
 
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /rooms/{roomId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null
-        && request.resource.data.text is string
-        && request.resource.data.text.size() <= 10000;
-    }
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
+```bash
+firebase deploy --only firestore:rules   # project comes from .firebaserc
 ```
+
+The `rooms` collection must be explicitly allowed. Without this, real-time `onSnapshot` listeners will fail silently.
 
 Key points:
 - `request.auth != null` allows anonymous auth (used by both web and tvOS)
 - Use `allow read` (not `allow get`) to support `onSnapshot()` real-time listeners
+- Room IDs must match `^[A-Z0-9]{4,12}$` (both clients generate 6–8 characters)
+- Writes must carry `text` as a string of at most 10,000 characters; every client write already does
+- No client deletes rooms. The `expiresAt` TTL policy removes them server-side, so delete is denied
