@@ -61,6 +61,22 @@ Flip Flap connects securely through the cloud so your phone remote works from an
 ### What's New (for version 1.0)
 Initial release.
 
+### What's New (for version 1.2), draft
+> **Author:** Claude Code (coder) · **Date:** 2026-09-21 · **Status:** proposed-by-agent. This draft is on the 1.2 version in App Store Connect; Charlie has not edited or approved it. If he edits it there, copy his text back here.
+
+KEEPS YOUR MUSIC PLAYING
+• Flip Flap used to stop whatever you were listening to. Now your music keeps going and the flaps clack along on top of it.
+
+LONG WORDS AND LINKS FIT
+• A word or link too long for one row now carries over to the next row. It used to get cut off.
+• Accented letters show up as the plain letter, so CAFÉ reads CAFE.
+
+BETTER AT STAYING CONNECTED
+• We rebuilt how the board stays connected, so one that's been on for days keeps getting your messages. If the connection does drop, you'll see "Reconnecting…" in the corner until it's back.
+
+EASIER ON YOUR TV
+• Everything on screen drifts by a few pixels every few minutes, to help keep a message you leave up for a long time from burning in.
+
 ### Keywords (100 characters max, comma-separated)
 split-flap,message board,display,sign,retro,flip,quote,signage,welcome,announcement
 

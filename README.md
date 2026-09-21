@@ -42,7 +42,7 @@ The display shows a grid of animated split‑flap cells; a separate “remote”
   - `firebase-lite.js` – Firestore for the remote (Firestore Lite, which only needs to write).
   - `docs/PROTOCOL.md` – Human‑readable description of the Firestore data model and protocol.
 
-- **tvOS app** (current version: **1.1**, build 2)
+- **tvOS app** (current version: **1.1**, build 3)
   - `tvos/README.md` – tvOS‑specific notes.
   - `tvos/SplitFlapTV/` – SwiftUI tvOS project.
     - `FlipFlapApp.swift` – App entry point.
