@@ -48,6 +48,8 @@ Charlie, 2026-09-21, for all DGR Labs app projects (also in the workspace `CLAUD
 4. **Submit, once Charlie has said in that session to submit that version.** Check `/v1/apps/6761391738/reviewSubmissions` for an open submission first. Then `POST /v1/reviewSubmissions` (platform `TV_OS`), `POST /v1/reviewSubmissionItems` with the version, and `PATCH` the submission with `submitted: true`. Expect `WAITING_FOR_REVIEW`. Update the status line above with the date and state.
 5. **Afterwards.** Flip Flap is not on supportbot's list and has no release-sync routine. A rejection goes in `../APP_STORE_REJECTIONS.md`, and a resubmission waits for Charlie.
 
+The shared release guide for all our apps (order of the work, each project's recipe, App Store Connect gotchas) is `../APP_STORE_RELEASE.md`, approved by Charlie 2026-09-21; read it when cutting a build, and add to it when a release teaches us something new.
+
 ## Architecture
 
 ```
