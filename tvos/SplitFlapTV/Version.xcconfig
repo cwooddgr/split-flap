@@ -1,5 +1,5 @@
 // The one place the app's version lives. Both build configurations read it
 // (it is the project's base configuration for Debug and Release).
 // MARKETING_VERSION is the App Store version; CURRENT_PROJECT_VERSION is the build.
-MARKETING_VERSION = 1.1
-CURRENT_PROJECT_VERSION = 2
+MARKETING_VERSION = 1.2
+CURRENT_PROJECT_VERSION = 3
