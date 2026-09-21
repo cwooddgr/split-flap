@@ -61,8 +61,8 @@ Flip Flap connects securely through the cloud so your phone remote works from an
 ### What's New (for version 1.0)
 Initial release.
 
-### What's New (for version 1.2), draft
-> **Author:** Claude Code (coder) · **Date:** 2026-09-21 · **Status:** proposed-by-agent. This draft is on the 1.2 version in App Store Connect; Charlie has not edited or approved it. If he edits it there, copy his text back here.
+### What's New (for version 1.2)
+> **Author:** Claude Code (coder) · **Date:** 2026-09-21 · **Status:** drafted by the agent, approved as written by Charlie 2026-09-21 (decided-by-user, his answer "2a"). It is on the 1.2 version in App Store Connect.
 
 KEEPS YOUR MUSIC PLAYING
 • Flip Flap used to stop whatever you were listening to. Now your music keeps going and the flaps clack along on top of it.
