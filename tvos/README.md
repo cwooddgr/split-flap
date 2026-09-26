@@ -35,7 +35,7 @@ SplitFlapTV/
     Assets.xcassets/              # App icon, top shelf, accent color
 ```
 
-See the repository root for the canonical protocol (`docs/PROTOCOL.md`), the web client, and overall architecture notes (`CLAUDE.md`).
+See the repository root for the canonical protocol (`docs/PROTOCOL.md`), the web client, and overall architecture notes (`docs/architecture.md`).
 
 ## Building
 
